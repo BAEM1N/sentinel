@@ -13,5 +13,15 @@ dependencies = [
     "python-dotenv>=1.2.2",
 ]
 
+[project.optional-dependencies]
+anthropic = ["langchain-anthropic>=0.3"]
+gemini = ["langchain-google-genai>=2.1"]
+ollama = ["langchain-ollama>=0.3"]
+all-providers = [
+    "langchain-anthropic>=0.3",
+    "langchain-google-genai>=2.1",
+    "langchain-ollama>=0.3",
+]
+
 [project.scripts]
 sentinel = "main:main"
