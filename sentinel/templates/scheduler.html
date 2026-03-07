@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Sentinel — Scheduler{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex items-baseline justify-between mb-8">
+  <h1 class="text-[22px] font-bold tracking-[-0.03em]">Scheduler</h1>
+  <div class="flex items-center gap-2">
+    {% if running %}
+    <span class="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span>
+    <span class="text-xs text-ink-muted">Running</span>
+    {% else %}
+    <span class="w-1.5 h-1.5 rounded-full bg-red-500 inline-block"></span>
+    <span class="text-xs text-ink-muted">Stopped</span>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Jobs -->
+<div class="border border-rule overflow-hidden">
+  <table class="w-full text-[13px]">
+    <thead>
+      <tr class="bg-ink text-white text-2xs uppercase tracking-[0.08em]">
+        <th class="text-left px-4 py-2.5 font-semibold">Job ID</th>
+        <th class="text-left px-4 py-2.5 font-semibold">Schedule</th>
+        <th class="text-right px-4 py-2.5 font-semibold">Next Run</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for job in jobs %}
+      <tr class="border-b border-rule last:border-0 hover:bg-ink-wash transition-colors row-animate" style="animation-delay: {{ loop.index0 * 40 }}ms">
+        <td class="px-4 py-3 font-medium font-mono text-xs">{{ job.id }}</td>
+        <td class="px-4 py-3 text-ink-muted">{{ job.description }}</td>
+        <td class="px-4 py-3 text-right font-mono text-xs text-ink-muted">{{ job.next_run }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Schedule Summary -->
+<div class="mt-8 grid grid-cols-3 border border-rule">
+  <div class="p-5 border-r border-rule">
+    <div class="text-2xs text-ink-muted uppercase tracking-[0.08em] mb-2 font-semibold">Daily</div>
+    <div class="text-sm text-ink-light">Every day at 00:00</div>
+    <div class="text-xs text-ink-faint mt-1">Previous day report</div>
+  </div>
+  <div class="p-5 border-r border-rule">
+    <div class="text-2xs text-ink-muted uppercase tracking-[0.08em] mb-2 font-semibold">Weekly</div>
+    <div class="text-sm text-ink-light">Every Monday at 00:00</div>
+    <div class="text-xs text-ink-faint mt-1">Previous Mon-Sun report</div>
+  </div>
+  <div class="p-5">
+    <div class="text-2xs text-ink-muted uppercase tracking-[0.08em] mb-2 font-semibold">Monthly</div>
+    <div class="text-sm text-ink-light">1st of month at 00:00</div>
+    <div class="text-xs text-ink-faint mt-1">Previous month report</div>
+  </div>
+</div>
+{% endblock %}

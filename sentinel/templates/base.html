@@ -4,34 +4,96 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Sentinel{% endblock %}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Pretendard Variable"', 'Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Helvetica Neue', 'sans-serif'],
+            mono: ['"SF Mono"', 'Consolas', '"Liberation Mono"', 'Menlo', 'monospace'],
+          },
+          colors: {
+            ink: { DEFAULT: '#111', light: '#444', muted: '#888', faint: '#bbb', wash: '#f7f7f7' },
+            rule: { DEFAULT: '#e0e0e0', dark: '#111' },
+          },
+          fontSize: {
+            '2xs': ['0.65rem', { lineHeight: '1' }],
+          },
+        },
+      },
+    }
+  </script>
   <style>
-    body { font-family: -apple-system, 'Segoe UI', sans-serif; }
+    * { font-feature-settings: 'ss01', 'cv11'; }
+    body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 3px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+
+    /* Nav active indicator */
+    .nav-link { position: relative; }
+    .nav-link.active { color: #111; }
+    .nav-link.active::after {
+      content: '';
+      position: absolute;
+      bottom: -17px;
+      left: 0;
+      right: 0;
+      height: 1.5px;
+      background: #111;
+    }
+
+    /* Table row fade-in */
+    @keyframes rowIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .row-animate { animation: rowIn 0.2s ease-out both; }
+
+    /* Form elements */
+    select, input[type="date"], input[type="text"] {
+      font-family: inherit;
+      outline: none;
+    }
+    select:focus, input:focus {
+      border-color: #111 !important;
+    }
   </style>
+  {% block head %}{% endblock %}
 </head>
-<body class="bg-gray-50 text-gray-900 min-h-screen">
-  <!-- Nav -->
-  <nav class="border-b border-gray-200 bg-white">
-    <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-      <a href="/" class="text-lg font-bold tracking-tight">Sentinel</a>
-      <div class="flex gap-6 text-sm text-gray-500">
-        <a href="/" class="hover:text-gray-900">Dashboard</a>
-        <a href="/reports" class="hover:text-gray-900">Reports</a>
-        <a href="/api/scheduler/status" class="hover:text-gray-900">Scheduler</a>
+<body class="bg-white text-ink font-sans min-h-screen flex flex-col">
+
+  <!-- Navigation -->
+  <nav class="border-b border-rule flex-shrink-0">
+    <div class="max-w-[960px] mx-auto px-6 h-12 flex items-center justify-between">
+      <div class="flex items-center gap-8">
+        <a href="/" class="text-sm font-bold tracking-[-0.02em] uppercase">Sentinel</a>
+        <div class="flex gap-5 text-[13px] text-ink-muted">
+          <a href="/" class="nav-link hover:text-ink {% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
+          <a href="/reports" class="nav-link hover:text-ink {% if active_page == 'reports' %}active{% endif %}">Reports</a>
+          <a href="/scheduler" class="nav-link hover:text-ink {% if active_page == 'scheduler' %}active{% endif %}">Scheduler</a>
+        </div>
       </div>
+      <div class="text-2xs text-ink-faint tracking-wide uppercase">LLMOps Agent</div>
     </div>
   </nav>
 
   <!-- Content -->
-  <main class="max-w-5xl mx-auto px-6 py-8">
+  <main class="flex-1 max-w-[960px] w-full mx-auto px-6 py-8">
     {% block content %}{% endblock %}
   </main>
 
   <!-- Footer -->
-  <footer class="border-t border-gray-200 mt-12">
-    <div class="max-w-5xl mx-auto px-6 py-4 text-xs text-gray-400">
-      Sentinel v0.0.1 — Langfuse LLMOps Agent
+  <footer class="border-t border-rule flex-shrink-0">
+    <div class="max-w-[960px] mx-auto px-6 h-10 flex items-center justify-between text-2xs text-ink-faint tracking-wide">
+      <span>Sentinel v0.0.1</span>
+      <span>Powered by Langfuse</span>
     </div>
   </footer>
+
 </body>
 </html>

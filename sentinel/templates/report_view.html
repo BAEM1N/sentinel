@@ -1,24 +1,101 @@
 {% extends "base.html" %}
 {% block title %}{{ filename }} — Sentinel{% endblock %}
 
+{% block head %}
+{% if not is_html %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+{% endif %}
+<style>
+  /* Markdown rendered styles */
+  .md-rendered { font-size: 14px; line-height: 1.75; color: #222; }
+  .md-rendered h1 { font-size: 22px; font-weight: 700; margin: 2em 0 0.6em; padding-bottom: 6px; border-bottom: 1.5px solid #111; letter-spacing: -0.02em; }
+  .md-rendered h1:first-child { margin-top: 0; }
+  .md-rendered h2 { font-size: 17px; font-weight: 700; margin: 1.8em 0 0.5em; padding-bottom: 4px; border-bottom: 1px solid #e0e0e0; }
+  .md-rendered h3 { font-size: 14px; font-weight: 600; margin: 1.4em 0 0.4em; color: #333; }
+  .md-rendered p { margin: 0.6em 0; }
+  .md-rendered ul, .md-rendered ol { margin: 0.6em 0; padding-left: 1.5em; }
+  .md-rendered li { margin: 0.25em 0; }
+  .md-rendered blockquote {
+    border-left: 2px solid #111;
+    padding: 0.4em 1em;
+    margin: 0.8em 0;
+    color: #555;
+    background: #fafafa;
+  }
+  .md-rendered table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1em 0;
+    font-size: 13px;
+  }
+  .md-rendered thead th {
+    background: #111;
+    color: #fff;
+    padding: 7px 12px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .md-rendered tbody td {
+    padding: 6px 12px;
+    border-bottom: 1px solid #eee;
+  }
+  .md-rendered tbody tr:hover { background: #fafafa; }
+  .md-rendered code {
+    font-family: 'SF Mono', Consolas, monospace;
+    font-size: 0.88em;
+    background: #f5f5f5;
+    padding: 1px 5px;
+    border: 1px solid #e8e8e8;
+  }
+  .md-rendered pre {
+    background: #111;
+    color: #e0e0e0;
+    padding: 14px 18px;
+    overflow-x: auto;
+    font-size: 12.5px;
+    line-height: 1.6;
+    margin: 1em 0;
+  }
+  .md-rendered pre code { background: none; border: none; padding: 0; color: inherit; }
+  .md-rendered hr { border: none; border-top: 1px solid #e0e0e0; margin: 2em 0; }
+  .md-rendered strong { font-weight: 700; }
+  .md-rendered a { color: #111; text-decoration: underline; text-underline-offset: 2px; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="flex items-center justify-between mb-6">
+<!-- Header -->
+<div class="flex items-start justify-between mb-6">
   <div>
-    <a href="/reports" class="text-sm text-gray-400 hover:text-gray-600">&larr; Reports</a>
-    <h1 class="text-xl font-bold mt-1">{{ filename }}</h1>
+    <a href="/reports" class="text-2xs text-ink-faint uppercase tracking-[0.08em] hover:text-ink-muted transition-colors">
+      &larr; Back to Reports
+    </a>
+    <h1 class="text-[20px] font-bold tracking-[-0.02em] mt-1.5">{{ filename }}</h1>
   </div>
-  <a href="/reports/{{ filename }}/raw" class="text-sm border border-gray-300 rounded px-3 py-1.5 text-gray-600 hover:bg-gray-100">
+  <a href="/reports/{{ filename }}/raw"
+     class="text-[13px] border border-rule px-4 py-1.5 text-ink-light hover:bg-ink hover:text-white transition-colors flex-shrink-0">
     Download
   </a>
 </div>
 
-<div class="border border-gray-200 rounded-lg bg-white overflow-hidden">
+<!-- Content -->
+<div class="border border-rule">
   {% if is_html %}
-    <iframe srcdoc="{{ content|e }}" class="w-full" style="min-height: 80vh; border: none;"></iframe>
+    <iframe srcdoc="{{ content|e }}" class="w-full" style="min-height: 85vh; border: none;"></iframe>
   {% else %}
-    <div class="p-6 prose prose-sm max-w-none" id="md-content">
-      <pre class="whitespace-pre-wrap text-sm leading-relaxed text-gray-800">{{ content }}</pre>
-    </div>
+    <div class="p-8 md-rendered" id="md-target"></div>
   {% endif %}
 </div>
+
+{% if not is_html %}
+<script>
+(function() {
+  const raw = {{ content|tojson }};
+  document.getElementById('md-target').innerHTML = marked.parse(raw);
+})();
+</script>
+{% endif %}
 {% endblock %}

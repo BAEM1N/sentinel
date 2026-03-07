@@ -48,6 +48,7 @@ async def page_index(request: Request):
         "md_count": md_count,
         "html_count": html_count,
         "total": len(reports),
+        "active_page": "dashboard",
     })
 
 
@@ -58,6 +59,7 @@ async def page_reports(request: Request):
     return request.app.state.templates.TemplateResponse("reports.html", {
         "request": request,
         "reports": reports,
+        "active_page": "reports",
     })
 
 
@@ -76,6 +78,7 @@ async def page_report_view(request: Request, filename: str):
         "filename": filename,
         "content": content,
         "is_html": is_html,
+        "active_page": "reports",
     })
 
 
@@ -172,9 +175,33 @@ async def api_generate(
     return RedirectResponse(url="/reports", status_code=303)
 
 
+@router.get("/scheduler", response_class=HTMLResponse)
+async def page_scheduler(request: Request):
+    """스케줄러 페이지."""
+    scheduler = request.app.state.scheduler
+    desc_map = {
+        "daily_report": "Every day at 00:00",
+        "weekly_report": "Every Monday at 00:00",
+        "monthly_report": "1st of each month at 00:00",
+    }
+    jobs = []
+    for job in scheduler.get_jobs():
+        jobs.append({
+            "id": job.id,
+            "description": desc_map.get(job.id, str(job.trigger)),
+            "next_run": str(job.next_run_time)[:19] if job.next_run_time else "paused",
+        })
+    return request.app.state.templates.TemplateResponse("scheduler.html", {
+        "request": request,
+        "running": scheduler.running,
+        "jobs": jobs,
+        "active_page": "scheduler",
+    })
+
+
 @router.get("/api/scheduler/status")
 async def scheduler_status(request: Request):
-    """스케줄러 상태 조회."""
+    """스케줄러 상태 JSON API."""
     scheduler = request.app.state.scheduler
     jobs = []
     for job in scheduler.get_jobs():

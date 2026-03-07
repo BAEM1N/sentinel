@@ -2,86 +2,96 @@
 {% block title %}Sentinel — Dashboard{% endblock %}
 
 {% block content %}
-<h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+<!-- Header -->
+<div class="flex items-baseline justify-between mb-8">
+  <h1 class="text-[22px] font-bold tracking-[-0.03em]">Dashboard</h1>
+  <span class="text-xs text-ink-muted">{{ total }} reports on file</span>
+</div>
 
-<!-- KPI -->
-<div class="grid grid-cols-3 gap-4 mb-8">
-  <div class="border border-gray-200 rounded-lg p-5 bg-white">
-    <div class="text-3xl font-bold">{{ total }}</div>
-    <div class="text-xs text-gray-400 uppercase tracking-wide mt-1">Total Reports</div>
+<!-- KPI Strip -->
+<div class="grid grid-cols-3 border border-rule mb-10">
+  <div class="p-5 border-r border-rule">
+    <div class="text-[32px] font-bold tracking-[-0.04em] leading-none">{{ total }}</div>
+    <div class="text-2xs text-ink-muted uppercase tracking-[0.08em] mt-2">Total Reports</div>
   </div>
-  <div class="border border-gray-200 rounded-lg p-5 bg-white">
-    <div class="text-3xl font-bold">{{ md_count }}</div>
-    <div class="text-xs text-gray-400 uppercase tracking-wide mt-1">Markdown</div>
+  <div class="p-5 border-r border-rule">
+    <div class="text-[32px] font-bold tracking-[-0.04em] leading-none">{{ md_count }}</div>
+    <div class="text-2xs text-ink-muted uppercase tracking-[0.08em] mt-2">Markdown</div>
   </div>
-  <div class="border border-gray-200 rounded-lg p-5 bg-white">
-    <div class="text-3xl font-bold">{{ html_count }}</div>
-    <div class="text-xs text-gray-400 uppercase tracking-wide mt-1">HTML</div>
+  <div class="p-5">
+    <div class="text-[32px] font-bold tracking-[-0.04em] leading-none">{{ html_count }}</div>
+    <div class="text-2xs text-ink-muted uppercase tracking-[0.08em] mt-2">HTML</div>
   </div>
 </div>
 
-<!-- Quick Generate -->
-<div class="border border-gray-200 rounded-lg p-6 bg-white mb-8">
-  <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-4">Generate Report</h2>
-  <form action="/api/generate" method="post" class="flex flex-wrap gap-4 items-end">
+<!-- Generate Report -->
+<div class="mb-10">
+  <div class="text-2xs text-ink-muted uppercase tracking-[0.1em] mb-3 font-semibold">Generate Report</div>
+  <form action="/api/generate" method="post" class="border border-rule p-5 flex flex-wrap gap-5 items-end">
     <div>
-      <label class="block text-xs text-gray-500 mb-1">Period</label>
-      <select name="period" class="border border-gray-300 rounded px-3 py-2 text-sm">
+      <label class="block text-2xs text-ink-muted uppercase tracking-[0.06em] mb-1.5">Period</label>
+      <select name="period" class="border border-rule rounded-none px-3 py-[7px] text-[13px] bg-white">
         <option value="daily">Daily</option>
         <option value="weekly">Weekly</option>
         <option value="monthly">Monthly</option>
       </select>
     </div>
     <div>
-      <label class="block text-xs text-gray-500 mb-1">From</label>
-      <input type="date" name="from_date" class="border border-gray-300 rounded px-3 py-2 text-sm">
+      <label class="block text-2xs text-ink-muted uppercase tracking-[0.06em] mb-1.5">From</label>
+      <input type="date" name="from_date" class="border border-rule rounded-none px-3 py-[7px] text-[13px] bg-white">
     </div>
     <div>
-      <label class="block text-xs text-gray-500 mb-1">To</label>
-      <input type="date" name="to_date" class="border border-gray-300 rounded px-3 py-2 text-sm">
+      <label class="block text-2xs text-ink-muted uppercase tracking-[0.06em] mb-1.5">To</label>
+      <input type="date" name="to_date" class="border border-rule rounded-none px-3 py-[7px] text-[13px] bg-white">
     </div>
-    <div class="flex items-center gap-2">
-      <input type="checkbox" name="output_html" value="true" id="html_opt" class="rounded">
-      <label for="html_opt" class="text-sm text-gray-600">HTML</label>
-    </div>
-    <button type="submit" class="bg-gray-900 text-white px-4 py-2 rounded text-sm hover:bg-gray-700">
+    <label class="flex items-center gap-2 cursor-pointer select-none">
+      <input type="checkbox" name="output_html" value="true" class="w-3.5 h-3.5 rounded-none border-rule accent-ink">
+      <span class="text-[13px] text-ink-light">+ HTML</span>
+    </label>
+    <button type="submit" class="bg-ink text-white px-5 py-[7px] text-[13px] font-medium hover:bg-ink-light transition-colors">
       Generate
     </button>
   </form>
 </div>
 
 <!-- Recent Reports -->
-<h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-3">Recent Reports</h2>
-{% if reports %}
-<div class="border border-gray-200 rounded-lg bg-white overflow-hidden">
-  <table class="w-full text-sm">
-    <thead>
-      <tr class="border-b border-gray-200 text-left text-xs text-gray-400 uppercase tracking-wide">
-        <th class="px-4 py-3">Name</th>
-        <th class="px-4 py-3">Type</th>
-        <th class="px-4 py-3">Size</th>
-        <th class="px-4 py-3">Modified</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in reports %}
-      <tr class="border-b border-gray-100 hover:bg-gray-50">
-        <td class="px-4 py-3">
-          <a href="/reports/{{ r.name }}" class="text-gray-900 hover:underline">{{ r.name }}</a>
-        </td>
-        <td class="px-4 py-3">
-          <span class="inline-block px-2 py-0.5 text-xs rounded {% if r.type == 'HTML' %}bg-gray-900 text-white{% else %}bg-gray-100 text-gray-600{% endif %}">
-            {{ r.type }}
-          </span>
-        </td>
-        <td class="px-4 py-3 text-gray-500">{{ r.size_kb }} KB</td>
-        <td class="px-4 py-3 text-gray-500">{{ r.modified }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div>
+  <div class="text-2xs text-ink-muted uppercase tracking-[0.1em] mb-3 font-semibold">Recent Reports</div>
+  {% if reports %}
+  <div class="border border-rule overflow-hidden">
+    <table class="w-full text-[13px]">
+      <thead>
+        <tr class="bg-ink text-white text-2xs uppercase tracking-[0.08em]">
+          <th class="text-left px-4 py-2.5 font-semibold">Name</th>
+          <th class="text-left px-4 py-2.5 font-semibold w-16">Type</th>
+          <th class="text-right px-4 py-2.5 font-semibold w-20">Size</th>
+          <th class="text-right px-4 py-2.5 font-semibold w-36">Modified</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in reports %}
+        <tr class="border-b border-rule last:border-0 hover:bg-ink-wash transition-colors row-animate" style="animation-delay: {{ loop.index0 * 30 }}ms">
+          <td class="px-4 py-2.5">
+            <a href="/reports/{{ r.name }}" class="hover:underline underline-offset-2">{{ r.name }}</a>
+          </td>
+          <td class="px-4 py-2.5">
+            {% if r.type == 'HTML' %}
+            <span class="inline-block bg-ink text-white text-2xs px-1.5 py-0.5 font-semibold tracking-wide">HTML</span>
+            {% else %}
+            <span class="inline-block border border-rule text-ink-muted text-2xs px-1.5 py-0.5 font-semibold tracking-wide">MD</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2.5 text-right text-ink-muted font-mono text-xs">{{ r.size_kb }}K</td>
+          <td class="px-4 py-2.5 text-right text-ink-muted font-mono text-xs">{{ r.modified }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="border border-rule p-8 text-center text-sm text-ink-muted">
+    No reports generated yet. Use the form above to create one.
+  </div>
+  {% endif %}
 </div>
-{% else %}
-<p class="text-gray-400 text-sm">No reports yet.</p>
-{% endif %}
 {% endblock %}
