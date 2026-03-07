@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Sentinel{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, 'Segoe UI', sans-serif; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+  <!-- Nav -->
+  <nav class="border-b border-gray-200 bg-white">
+    <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href="/" class="text-lg font-bold tracking-tight">Sentinel</a>
+      <div class="flex gap-6 text-sm text-gray-500">
+        <a href="/" class="hover:text-gray-900">Dashboard</a>
+        <a href="/reports" class="hover:text-gray-900">Reports</a>
+        <a href="/api/scheduler/status" class="hover:text-gray-900">Scheduler</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Content -->
+  <main class="max-w-5xl mx-auto px-6 py-8">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-gray-200 mt-12">
+    <div class="max-w-5xl mx-auto px-6 py-4 text-xs text-gray-400">
+      Sentinel v0.0.1 — Langfuse LLMOps Agent
+    </div>
+  </footer>
+</body>
+</html>

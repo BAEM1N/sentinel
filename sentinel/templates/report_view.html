@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ filename }} — Sentinel{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <a href="/reports" class="text-sm text-gray-400 hover:text-gray-600">&larr; Reports</a>
+    <h1 class="text-xl font-bold mt-1">{{ filename }}</h1>
+  </div>
+  <a href="/reports/{{ filename }}/raw" class="text-sm border border-gray-300 rounded px-3 py-1.5 text-gray-600 hover:bg-gray-100">
+    Download
+  </a>
+</div>
+
+<div class="border border-gray-200 rounded-lg bg-white overflow-hidden">
+  {% if is_html %}
+    <iframe srcdoc="{{ content|e }}" class="w-full" style="min-height: 80vh; border: none;"></iframe>
+  {% else %}
+    <div class="p-6 prose prose-sm max-w-none" id="md-content">
+      <pre class="whitespace-pre-wrap text-sm leading-relaxed text-gray-800">{{ content }}</pre>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

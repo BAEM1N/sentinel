@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Sentinel — Dashboard{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+
+<!-- KPI -->
+<div class="grid grid-cols-3 gap-4 mb-8">
+  <div class="border border-gray-200 rounded-lg p-5 bg-white">
+    <div class="text-3xl font-bold">{{ total }}</div>
+    <div class="text-xs text-gray-400 uppercase tracking-wide mt-1">Total Reports</div>
+  </div>
+  <div class="border border-gray-200 rounded-lg p-5 bg-white">
+    <div class="text-3xl font-bold">{{ md_count }}</div>
+    <div class="text-xs text-gray-400 uppercase tracking-wide mt-1">Markdown</div>
+  </div>
+  <div class="border border-gray-200 rounded-lg p-5 bg-white">
+    <div class="text-3xl font-bold">{{ html_count }}</div>
+    <div class="text-xs text-gray-400 uppercase tracking-wide mt-1">HTML</div>
+  </div>
+</div>
+
+<!-- Quick Generate -->
+<div class="border border-gray-200 rounded-lg p-6 bg-white mb-8">
+  <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-4">Generate Report</h2>
+  <form action="/api/generate" method="post" class="flex flex-wrap gap-4 items-end">
+    <div>
+      <label class="block text-xs text-gray-500 mb-1">Period</label>
+      <select name="period" class="border border-gray-300 rounded px-3 py-2 text-sm">
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly">Monthly</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-gray-500 mb-1">From</label>
+      <input type="date" name="from_date" class="border border-gray-300 rounded px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label class="block text-xs text-gray-500 mb-1">To</label>
+      <input type="date" name="to_date" class="border border-gray-300 rounded px-3 py-2 text-sm">
+    </div>
+    <div class="flex items-center gap-2">
+      <input type="checkbox" name="output_html" value="true" id="html_opt" class="rounded">
+      <label for="html_opt" class="text-sm text-gray-600">HTML</label>
+    </div>
+    <button type="submit" class="bg-gray-900 text-white px-4 py-2 rounded text-sm hover:bg-gray-700">
+      Generate
+    </button>
+  </form>
+</div>
+
+<!-- Recent Reports -->
+<h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-3">Recent Reports</h2>
+{% if reports %}
+<div class="border border-gray-200 rounded-lg bg-white overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-gray-200 text-left text-xs text-gray-400 uppercase tracking-wide">
+        <th class="px-4 py-3">Name</th>
+        <th class="px-4 py-3">Type</th>
+        <th class="px-4 py-3">Size</th>
+        <th class="px-4 py-3">Modified</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in reports %}
+      <tr class="border-b border-gray-100 hover:bg-gray-50">
+        <td class="px-4 py-3">
+          <a href="/reports/{{ r.name }}" class="text-gray-900 hover:underline">{{ r.name }}</a>
+        </td>
+        <td class="px-4 py-3">
+          <span class="inline-block px-2 py-0.5 text-xs rounded {% if r.type == 'HTML' %}bg-gray-900 text-white{% else %}bg-gray-100 text-gray-600{% endif %}">
+            {{ r.type }}
+          </span>
+        </td>
+        <td class="px-4 py-3 text-gray-500">{{ r.size_kb }} KB</td>
+        <td class="px-4 py-3 text-gray-500">{{ r.modified }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-gray-400 text-sm">No reports yet.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,50 @@
+"""FastAPI 앱 팩토리."""
+
+import os
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+load_dotenv()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """앱 시작/종료 시 스케줄러 관리."""
+    from sentinel.web.scheduler import create_scheduler
+
+    scheduler = create_scheduler()
+    scheduler.start()
+    app.state.scheduler = scheduler
+    print("[sentinel] scheduler started: daily(00:00), weekly(Mon 00:00), monthly(1st 00:00)")
+    yield
+    scheduler.shutdown()
+    print("[sentinel] scheduler stopped")
+
+
+def create_app() -> FastAPI:
+    """FastAPI 앱을 생성합니다."""
+    app = FastAPI(
+        title="Sentinel",
+        description="Langfuse LLMOps Agent",
+        version="0.0.1",
+        lifespan=lifespan,
+    )
+
+    # Jinja2 템플릿
+    templates_dir = Path(__file__).parent.parent / "templates"
+    app.state.templates = Jinja2Templates(directory=str(templates_dir))
+
+    # reports 정적 파일 서빙
+    reports_dir = os.environ.get("SENTINEL_REPORTS_DIR", "./reports")
+    os.makedirs(reports_dir, exist_ok=True)
+
+    # 라우트 등록
+    from sentinel.web.routes import router
+    app.include_router(router)
+
+    return app

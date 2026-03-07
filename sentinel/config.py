@@ -153,8 +153,10 @@ lf_client = Langfuse()
 # --- 콜백 (observability) ---
 langfuse_handler = None
 if os.environ.get("LANGFUSE_SECRET_KEY"):
-    from langfuse.langchain import CallbackHandler  # noqa: E402
-
-    langfuse_handler = CallbackHandler()
+    try:
+        from langfuse.langchain import CallbackHandler  # noqa: E402
+        langfuse_handler = CallbackHandler()
+    except (ImportError, ModuleNotFoundError):
+        pass
 
 lf_config: dict = {"callbacks": [langfuse_handler]} if langfuse_handler else {}
