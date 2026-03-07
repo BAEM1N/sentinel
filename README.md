@@ -25,6 +25,7 @@
 ```
 sentinel/
 ├── main.py                      # CLI 엔트리포인트 (대화형 / 단일 질의)
+├── server.py                    # FastAPI 웹 서버 엔트리포인트
 ├── pyproject.toml
 ├── sentinel/
 │   ├── agent.py                 # create_sentinel_agent()
@@ -32,12 +33,22 @@ sentinel/
 │   ├── prompts.py               # Sentinel 시스템 프롬프트
 │   ├── subagents.py             # 서브에이전트 3개
 │   ├── report_template.html     # McKinsey 스타일 A4 HTML 템플릿
-│   └── tools/
-│       ├── traces.py            # list_traces, get_trace_detail, list_sessions
-│       ├── prompt_mgmt.py       # get/save_langfuse_prompt, suggest_prompt_improvement
-│       ├── evaluation.py        # evaluate_with_llm, list_scores, create_score
-│       ├── metrics.py           # query_metrics, generate_report
-│       └── platform.py          # manage_datasets, manage_annotations, think_tool
+│   ├── tools/
+│   │   ├── traces.py            # list_traces, get_trace_detail, list_sessions
+│   │   ├── prompt_mgmt.py       # get/save_langfuse_prompt, suggest_prompt_improvement
+│   │   ├── evaluation.py        # evaluate_with_llm, list_scores, create_score
+│   │   ├── metrics.py           # query_metrics, generate_report
+│   │   └── platform.py          # manage_datasets, manage_annotations, think_tool
+│   ├── web/
+│   │   ├── app.py               # FastAPI 앱 팩토리
+│   │   ├── routes.py            # 웹 페이지 + API 라우트
+│   │   ├── scheduler.py         # APScheduler 크론 잡
+│   │   └── notify.py            # Slack / Telegram / Email 알림
+│   └── templates/
+│       ├── base.html            # Jinja2 + Tailwind 베이스
+│       ├── index.html           # 대시보드
+│       ├── reports.html         # 보고서 목록 + 생성
+│       └── report_view.html     # 보고서 상세 보기
 ├── skills/
 │   └── langfuse-ops/SKILL.md    # Langfuse SDK API 레퍼런스 (에이전트용)
 └── reports/                     # 보고서 출력 디렉토리
@@ -70,15 +81,42 @@ pip install -e ".[all-providers]"
 ### 3. 실행
 
 ```bash
-# 대화형 모드
+# CLI 대화형 모드
 python main.py
 
-# 단일 질의
+# CLI 단일 질의
 python main.py --query "최근 3일간 트레이스를 분석해주세요"
 
-# 보고서 생성
-python main.py -q "주간 LLMOps 보고서를 생성해주세요"
+# 웹 서버 (대시보드 + 스케줄러)
+python server.py
 ```
+
+## 웹 서버
+
+`python server.py`로 FastAPI 서버를 실행하면:
+
+- **대시보드** (`/`) — 보고서 현황 + 즉시 생성 폼
+- **보고서 목록** (`/reports`) — 전체 보고서 조회, 다운로드
+- **보고서 상세** (`/reports/{filename}`) — MD/HTML 보고서 보기
+- **스케줄러 상태** (`/api/scheduler/status`) — 크론 잡 현황
+
+### 자동 보고서 스케줄러
+
+| 주기 | 실행 시각 | 보고서 범위 |
+|------|----------|-----------|
+| 일간 | 매일 00:00 | 전일 (00:00~23:59) |
+| 주간 | 매주 월요일 00:00 | 지난주 월~일 |
+| 월간 | 매월 1일 00:00 | 지난달 전체 |
+
+### 알림 채널
+
+보고서 생성 시 설정된 채널로 자동 전송합니다.
+
+| 채널 | 필요 환경변수 |
+|------|-------------|
+| Slack | `SENTINEL_SLACK_WEBHOOK` |
+| Telegram | `SENTINEL_TELEGRAM_BOT_TOKEN`, `SENTINEL_TELEGRAM_CHAT_ID` |
+| Email (SMTP) | `SENTINEL_SMTP_HOST`, `SENTINEL_SMTP_USER`, `SENTINEL_SMTP_PASS`, `SENTINEL_EMAIL_TO` |
 
 ## 멀티 프로바이더
 
@@ -96,23 +134,12 @@ python main.py -q "주간 LLMOps 보고서를 생성해주세요"
 | `qwen` | langchain-openai | qwen-max | `DASHSCOPE_API_KEY` |
 | `glm` | langchain-openai | glm-4-plus | `GLM_API_KEY` |
 
-```env
-# Anthropic 사용 예시
-SENTINEL_PROVIDER=anthropic
-SENTINEL_MODEL=claude-sonnet-4-6
-ANTHROPIC_API_KEY=sk-ant-...
-```
-
 ## 보고서
 
 `generate_report` 도구는 Markdown 보고서를 항상 생성하며, HTML은 옵션입니다.
 
 - **MD** (기본): McKinsey 컨설팅 스타일 구조화된 보고서
 - **HTML** (`output_html=True`): A4 인쇄 대응 HTML 보고서
-
-```
-python main.py -q "주간 보고서를 HTML로도 생성해주세요"
-```
 
 ## 환경 변수
 
@@ -125,17 +152,25 @@ python main.py -q "주간 보고서를 HTML로도 생성해주세요"
 | `SENTINEL_PROVIDER` | — | `openai` | LLM 프로바이더 |
 | `SENTINEL_MODEL` | — | 프로바이더별 기본값 | LLM 모델명 |
 | `SENTINEL_FALLBACK_MODEL` | — | `gpt-5.3-instant` | 폴백 모델 |
-| `SENTINEL_BASE_URL` | — | — | OpenAI 호환 프로바이더 엔드포인트 |
-| `SENTINEL_API_KEY` | — | — | 프로바이더 공통 API 키 |
 | `SENTINEL_REPORTS_DIR` | — | `./reports` | 보고서 저장 경로 |
 | `SENTINEL_RUN_LIMIT` | — | `30` | 최대 모델 호출 수 |
+| `SENTINEL_AUTO_HTML` | — | `true` | 스케줄러 HTML 자동 생성 |
+| `SENTINEL_SLACK_WEBHOOK` | — | — | Slack Incoming Webhook URL |
+| `SENTINEL_TELEGRAM_BOT_TOKEN` | — | — | Telegram Bot 토큰 |
+| `SENTINEL_TELEGRAM_CHAT_ID` | — | — | Telegram Chat ID |
+| `SENTINEL_SMTP_HOST` | — | — | SMTP 서버 호스트 |
+| `SENTINEL_SMTP_USER` | — | — | SMTP 로그인 사용자 |
+| `SENTINEL_SMTP_PASS` | — | — | SMTP 비밀번호 |
+| `SENTINEL_EMAIL_TO` | — | — | 보고서 수신 이메일 |
 
 ## 기술 스택
 
-- [Deep Agents](https://deepagents.ai) — 에이전트 프레임워크 (서브에이전트, 스킬, 백엔드)
+- [Deep Agents](https://deepagents.ai) — 에이전트 프레임워크
 - [LangChain](https://python.langchain.com) — LLM 추상화, 도구 정의
 - [LangGraph](https://langchain-ai.github.io/langgraph) — 상태 관리, 체크포인팅
 - [Langfuse](https://langfuse.com) — LLM 관측성 플랫폼
+- [FastAPI](https://fastapi.tiangolo.com) — 웹 서버
+- [APScheduler](https://apscheduler.readthedocs.io) — 크론 스케줄러
 
 ## 라이선스
 
