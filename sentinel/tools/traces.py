@@ -1,10 +1,13 @@
 """트레이스 · 세션 조회 도구 (다중 필터 지원)."""
 
 import json
+import logging
 
 from langchain.tools import tool
 
 from sentinel.config import lf_client
+
+logger = logging.getLogger("sentinel.tools.traces")
 
 
 @tool
@@ -15,6 +18,11 @@ def list_traces(
     from_ts: str = "",
     to_ts: str = "",
     tags: str = "",
+    environment: str = "",
+    release: str = "",
+    version: str = "",
+    order_by: str = "",
+    page: int = 1,
     limit: int = 20,
 ) -> str:
     """Langfuse에서 트레이스 목록을 다양한 필터로 조회합니다.
@@ -26,6 +34,11 @@ def list_traces(
         from_ts: 시작 날짜 (ISO8601, e.g. 2025-03-01)
         to_ts: 종료 날짜 (ISO8601, e.g. 2025-03-07)
         tags: 태그 필터 (쉼표 구분)
+        environment: 환경 필터 (e.g. production, staging)
+        release: 릴리스 필터
+        version: 버전 필터
+        order_by: 정렬 기준 (e.g. timestamp)
+        page: 페이지 번호 (기본 1)
         limit: 최대 조회 수 (기본 20)
     """
     kwargs: dict = {"limit": limit}
@@ -41,8 +54,22 @@ def list_traces(
         kwargs["to_timestamp"] = to_ts
     if tags:
         kwargs["tags"] = [t.strip() for t in tags.split(",")]
+    if environment:
+        kwargs["environment"] = environment
+    if release:
+        kwargs["release"] = release
+    if version:
+        kwargs["version"] = version
+    if order_by:
+        kwargs["order_by"] = order_by
+    if page > 1:
+        kwargs["page"] = page
 
-    res = lf_client.api.trace.list(**kwargs)
+    try:
+        res = lf_client.api.trace.list(**kwargs)
+    except Exception as e:
+        logger.exception("Langfuse trace list API 호출 실패")
+        return json.dumps({"error": f"Langfuse API 오류: {e}"}, ensure_ascii=False)
     data = res.data if hasattr(res, "data") else res
 
     rows = []
@@ -60,6 +87,9 @@ def list_traces(
                 "output_tokens": getattr(t, "output_tokens", None),
                 "tags": getattr(t, "tags", []),
                 "level": getattr(t, "level", None),
+                "environment": getattr(t, "environment", None),
+                "release": getattr(t, "release", None),
+                "version": getattr(t, "version", None),
             }
         )
     return json.dumps(rows, ensure_ascii=False, indent=2, default=str)
@@ -72,7 +102,11 @@ def get_trace_detail(trace_id: str) -> str:
     Args:
         trace_id: 조회할 트레이스 ID
     """
-    t = lf_client.api.trace.get(trace_id)
+    try:
+        t = lf_client.api.trace.get(trace_id)
+    except Exception as e:
+        logger.exception("trace detail API 호출 실패: %s", trace_id)
+        return json.dumps({"error": f"Langfuse API 오류: {e}"}, ensure_ascii=False)
     detail = {
         "id": t.id,
         "name": getattr(t, "name", None),
@@ -113,7 +147,11 @@ def list_sessions(limit: int = 20) -> str:
     Args:
         limit: 최대 조회 수
     """
-    res = lf_client.api.sessions.list(limit=limit)
+    try:
+        res = lf_client.api.sessions.list(limit=limit)
+    except Exception as e:
+        logger.exception("sessions list API 호출 실패")
+        return json.dumps({"error": f"Langfuse API 오류: {e}"}, ensure_ascii=False)
     data = res.data if hasattr(res, "data") else res
     rows = []
     for s in data:

@@ -74,6 +74,19 @@ _PROVIDER_DEFAULTS: dict[str, dict] = {
 # OpenAI 호환 API를 사용하는 프로바이더 (ChatOpenAI + base_url)
 _OPENAI_COMPAT_PROVIDERS = {"vllm", "lmstudio", "openrouter", "qwen", "glm"}
 
+# 프로바이더별 기본 fallback 모델
+_PROVIDER_FALLBACK_DEFAULTS: dict[str, str] = {
+    "openai": "gpt-4.1-mini",
+    "anthropic": "claude-haiku-4-5-20251001",
+    "gemini": "gemini-2.0-flash-lite",
+    "ollama": "llama3.1",
+    "vllm": "meta-llama/Llama-3.1-8B-Instruct",
+    "lmstudio": "local-model",
+    "openrouter": "anthropic/claude-haiku-4-5-20251001",
+    "qwen": "qwen-turbo",
+    "glm": "glm-4-flash",
+}
+
 
 # ---------------------------------------------------------------------------
 # 모델 팩토리

@@ -1,5 +1,6 @@
 """FastAPI 앱 팩토리."""
 
+import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -11,23 +12,40 @@ from fastapi.templating import Jinja2Templates
 
 load_dotenv()
 
+logger = logging.getLogger("sentinel.web")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """앱 시작/종료 시 스케줄러 관리."""
-    from sentinel.web.scheduler import create_scheduler
+    """앱 시작/종료 시 스케줄러 관리.
 
-    scheduler = create_scheduler()
-    scheduler.start()
-    app.state.scheduler = scheduler
-    print("[sentinel] scheduler started: daily(00:00), weekly(Mon 00:00), monthly(1st 00:00)")
+    SENTINEL_ENABLE_SCHEDULER=false 로 비활성화할 수 있습니다.
+    멀티 인스턴스 배포 시 하나의 인스턴스에서만 활성화하세요.
+    """
+    enable = os.environ.get("SENTINEL_ENABLE_SCHEDULER", "true").lower()
+    if enable in ("true", "1", "yes"):
+        from sentinel.web.scheduler import create_scheduler
+
+        scheduler = create_scheduler()
+        scheduler.start()
+        app.state.scheduler = scheduler
+        logger.info("scheduler started: daily(00:00), weekly(Mon 00:00), monthly(1st 00:00)")
+    else:
+        logger.info("scheduler disabled (SENTINEL_ENABLE_SCHEDULER=%s)", enable)
     yield
-    scheduler.shutdown()
-    print("[sentinel] scheduler stopped")
+    scheduler = getattr(app.state, "scheduler", None)
+    if scheduler is not None:
+        scheduler.shutdown()
+        logger.info("scheduler stopped")
 
 
 def create_app() -> FastAPI:
     """FastAPI 앱을 생성합니다."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="[sentinel] %(levelname)s %(name)s — %(message)s",
+    )
+
     app = FastAPI(
         title="Sentinel",
         description="Langfuse LLMOps Agent",

@@ -4,6 +4,7 @@
 {% block head %}
 {% if not is_html %}
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 {% endif %}
 <style>
   /* Markdown rendered styles */
@@ -84,7 +85,8 @@
 <!-- Content -->
 <div class="border border-rule">
   {% if is_html %}
-    <iframe srcdoc="{{ content|e }}" class="w-full" style="min-height: 85vh; border: none;"></iframe>
+    <iframe srcdoc="{{ content|e }}" class="w-full" style="min-height: 85vh; border: none;"
+            sandbox="allow-same-origin" referrerpolicy="no-referrer"></iframe>
   {% else %}
     <div class="p-8 md-rendered" id="md-target"></div>
   {% endif %}
@@ -94,7 +96,14 @@
 <script>
 (function() {
   const raw = {{ content|tojson }};
-  document.getElementById('md-target').innerHTML = marked.parse(raw);
+  const parsed = marked.parse(raw);
+  document.getElementById('md-target').innerHTML = DOMPurify.sanitize(parsed, {
+    ALLOWED_TAGS: ['h1','h2','h3','h4','h5','h6','p','br','hr','ul','ol','li',
+                   'table','thead','tbody','tr','th','td','blockquote','pre','code',
+                   'strong','em','a','span','div','img','sup','sub','del','s'],
+    ALLOWED_ATTR: ['href','src','alt','title','class','id','colspan','rowspan'],
+    ALLOW_DATA_ATTR: false,
+  });
 })();
 </script>
 {% endif %}

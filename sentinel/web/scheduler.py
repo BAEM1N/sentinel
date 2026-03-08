@@ -1,6 +1,8 @@
 """스케줄러 — 일간/주간/월간 보고서 자동 생성."""
 
+import logging
 import os
+import uuid
 from datetime import datetime, timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -10,6 +12,8 @@ from sentinel.tools.metrics import REPORT_MD_PROMPT, REPORT_HTML_PROMPT
 from sentinel.config import model
 from sentinel.web.notify import send_report
 
+logger = logging.getLogger("sentinel.scheduler")
+
 
 def _generate_scheduled_report(period: str, from_ts: str, to_ts: str):
     """스케줄러에서 호출하는 보고서 생성 함수."""
@@ -17,11 +21,18 @@ def _generate_scheduled_report(period: str, from_ts: str, to_ts: str):
     period_kr = {"daily": "일간", "weekly": "주간", "monthly": "월간"}.get(period, period)
     date_label = f"{from_ts[:10]} ~ {to_ts[:10]}"
     generated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    run_id = uuid.uuid4().hex[:8]
 
-    metrics_json, traces_json, scores_json = _collect_report_data(from_ts, to_ts, gran)
+    try:
+        metrics_json, traces_json, scores_json = _collect_report_data(from_ts, to_ts, gran)
+    except Exception as e:
+        logger.error("[scheduler] %s 보고서 데이터 수집 실패: %s", period, e)
+        return
 
     reports_dir = os.environ.get("SENTINEL_REPORTS_DIR", "./reports")
     os.makedirs(reports_dir, exist_ok=True)
+
+    file_stem = f"{period}_report_{from_ts[:10]}_{run_id}"
 
     # MD 보고서
     md_prompt = REPORT_MD_PROMPT.format(
@@ -30,13 +41,17 @@ def _generate_scheduled_report(period: str, from_ts: str, to_ts: str):
         metrics_json=metrics_json, traces_json=traces_json,
         scores_json=scores_json,
     )
-    md_resp = model.invoke(md_prompt)
+    try:
+        md_resp = model.invoke(md_prompt)
+    except Exception as e:
+        logger.error("[scheduler] %s MD 보고서 LLM 호출 실패: %s", period, e)
+        return
     md_content = _strip_code_fence(md_resp.content)
-    md_path = os.path.join(reports_dir, f"{period}_report_{from_ts[:10]}.md")
+    md_path = os.path.join(reports_dir, f"{file_stem}.md")
     with open(md_path, "w", encoding="utf-8") as f:
         f.write(md_content)
 
-    # HTML 보고서 (스케줄러는 항상 HTML도 생성)
+    # HTML 보고서 (스케줄러는 환경변수 기반)
     html_path = None
     auto_html = os.environ.get("SENTINEL_AUTO_HTML", "true").lower() == "true"
     if auto_html:
@@ -46,7 +61,14 @@ def _generate_scheduled_report(period: str, from_ts: str, to_ts: str):
             metrics_json=metrics_json, traces_json=traces_json,
             scores_json=scores_json,
         )
-        html_resp = model.invoke(html_prompt)
+        try:
+            html_resp = model.invoke(html_prompt)
+        except Exception as e:
+            logger.error("[scheduler] %s HTML 보고서 LLM 호출 실패: %s", period, e)
+            # MD는 이미 저장됐으므로 알림은 MD만으로 진행
+            results = send_report(md_path, None)
+            logger.info("[scheduler] %s 보고서 생성 (MD만): %s | 알림: %s", period, md_path, results)
+            return
         html_body = _strip_code_fence(html_resp.content)
         template = _load_template()
         title = f"LLMOps {period_kr} 보고서 — {date_label}"
@@ -56,13 +78,13 @@ def _generate_scheduled_report(period: str, from_ts: str, to_ts: str):
             .replace("{{content}}", html_body)
             .replace("{{generated_at}}", generated_at)
         )
-        html_path = os.path.join(reports_dir, f"{period}_report_{from_ts[:10]}.html")
+        html_path = os.path.join(reports_dir, f"{file_stem}.html")
         with open(html_path, "w", encoding="utf-8") as f:
             f.write(full_html)
 
     # 알림 전송
     results = send_report(md_path, html_path)
-    print(f"[scheduler] {period} 보고서 생성 완료: {md_path} | 알림: {results}")
+    logger.info("[scheduler] %s 보고서 생성 완료: %s | 알림: %s", period, md_path, results)
 
 
 def _job_daily():

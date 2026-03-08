@@ -24,7 +24,7 @@
 
 ```
 sentinel/
-├── main.py                      # CLI 엔트리포인트 (대화형 / 단일 질의)
+├── main.py                      # CLI 엔트리포인트 (대화형 / 단일 질의 / --json / --output)
 ├── server.py                    # FastAPI 웹 서버 엔트리포인트
 ├── pyproject.toml
 ├── sentinel/
@@ -40,15 +40,16 @@ sentinel/
 │   │   ├── metrics.py           # query_metrics, generate_report
 │   │   └── platform.py          # manage_datasets, manage_annotations, think_tool
 │   ├── web/
-│   │   ├── app.py               # FastAPI 앱 팩토리
-│   │   ├── routes.py            # 웹 페이지 + API 라우트
+│   │   ├── app.py               # FastAPI 앱 팩토리 (스케줄러 on/off 가능)
+│   │   ├── routes.py            # 웹 페이지 + API + /health + /ready
 │   │   ├── scheduler.py         # APScheduler 크론 잡
 │   │   └── notify.py            # Slack / Telegram / Email 알림
 │   └── templates/
 │       ├── base.html            # Jinja2 + Tailwind 베이스
 │       ├── index.html           # 대시보드
 │       ├── reports.html         # 보고서 목록 + 생성
-│       └── report_view.html     # 보고서 상세 보기
+│       ├── report_view.html     # 보고서 상세 보기 (DOMPurify sanitize)
+│       └── scheduler.html       # 스케줄러 상태
 ├── skills/
 │   └── langfuse-ops/SKILL.md    # Langfuse SDK API 레퍼런스 (에이전트용)
 └── reports/                     # 보고서 출력 디렉토리
@@ -97,8 +98,12 @@ python server.py
 
 - **대시보드** (`/`) — 보고서 현황 + 즉시 생성 폼
 - **보고서 목록** (`/reports`) — 전체 보고서 조회, 다운로드
-- **보고서 상세** (`/reports/{filename}`) — MD/HTML 보고서 보기
-- **스케줄러 상태** (`/api/scheduler/status`) — 크론 잡 현황
+- **보고서 상세** (`/reports/{filename}`) — MD/HTML 보고서 보기 (XSS sanitize 적용)
+- **보고서 생성** (`POST /api/generate`) — 기간/날짜 지정 보고서 생성 + 알림
+- **스케줄러 현황** (`/scheduler`) — 스케줄러 상태 및 잡 목록
+- **스케줄러 API** (`/api/scheduler/status`) — 크론 잡 현황 JSON
+- **헬스 체크** (`/health`) — 프로세스 상태
+- **준비 상태** (`/ready`) — Langfuse/스토리지/스케줄러 의존성 체크
 
 ### 자동 보고서 스케줄러
 
@@ -140,6 +145,8 @@ python server.py
 
 - **MD** (기본): McKinsey 컨설팅 스타일 구조화된 보고서
 - **HTML** (`output_html=True`): A4 인쇄 대응 HTML 보고서
+- 스케줄러는 `SENTINEL_AUTO_HTML=true` (기본) 일 때 HTML도 함께 생성합니다
+- 파일명에 run ID가 포함되어 동일 기간 재생성 시 충돌하지 않습니다
 
 ## 환경 변수
 
@@ -155,6 +162,8 @@ python server.py
 | `SENTINEL_REPORTS_DIR` | — | `./reports` | 보고서 저장 경로 |
 | `SENTINEL_RUN_LIMIT` | — | `30` | 최대 모델 호출 수 |
 | `SENTINEL_AUTO_HTML` | — | `true` | 스케줄러 HTML 자동 생성 |
+| `SENTINEL_ENABLE_SCHEDULER` | — | `true` | 스케줄러 활성화 (멀티 인스턴스 시 하나만) |
+| `SENTINEL_TIMEZONE` | — | `UTC` | 스케줄러 시간대 표시 |
 | `SENTINEL_SLACK_WEBHOOK` | — | — | Slack Incoming Webhook URL |
 | `SENTINEL_TELEGRAM_BOT_TOKEN` | — | — | Telegram Bot 토큰 |
 | `SENTINEL_TELEGRAM_CHAT_ID` | — | — | Telegram Chat ID |
