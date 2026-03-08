@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}Sentinel — Job {{ job.id }}{% endblock %}
+
+{% block content %}
+<!-- Back link -->
+<a href="/jobs" class="inline-flex items-center gap-1.5 text-[13px] text-ink-muted hover:text-ink transition-colors mb-6">
+  <svg class="w-3 h-3" fill="none" viewBox="0 0 12 12" stroke="currentColor" stroke-width="2"><path d="M8 2L4 6l4 4"/></svg>
+  Back to Jobs
+</a>
+
+<!-- Header -->
+<div class="flex items-baseline justify-between mb-8">
+  <h1 class="text-[22px] font-bold tracking-[-0.03em] font-mono">{{ job.id }}</h1>
+  <div id="status-badge">
+    {% if job.status == 'queued' %}
+    <span class="inline-block border border-rule text-ink-muted text-2xs px-2 py-1 font-semibold tracking-wide uppercase">Queued</span>
+    {% elif job.status == 'running' %}
+    <span class="inline-block border border-blue-400 text-blue-600 text-2xs px-2 py-1 font-semibold tracking-wide uppercase">Running</span>
+    {% elif job.status == 'succeeded' %}
+    <span class="inline-block bg-ink text-white text-2xs px-2 py-1 font-semibold tracking-wide uppercase">Succeeded</span>
+    {% elif job.status == 'failed' %}
+    <span class="inline-block bg-red-600 text-white text-2xs px-2 py-1 font-semibold tracking-wide uppercase">Failed</span>
+    {% endif %}
+  </div>
+</div>
+
+<!-- KPI Grid -->
+<div class="grid grid-cols-3 border border-rule mb-8">
+  <div class="p-5 border-r border-rule">
+    <div class="text-2xs text-ink-muted uppercase tracking-[0.08em] mb-2 font-semibold">Type</div>
+    <div class="text-sm text-ink-light">{{ job.type }}</div>
+  </div>
+  <div class="p-5 border-r border-rule">
+    <div class="text-2xs text-ink-muted uppercase tracking-[0.08em] mb-2 font-semibold">Created</div>
+    <div class="text-sm text-ink-light font-mono">{{ job.created_at[:19] }}</div>
+  </div>
+  <div class="p-5">
+    <div class="text-2xs text-ink-muted uppercase tracking-[0.08em] mb-2 font-semibold">Duration</div>
+    <div class="text-sm text-ink-light font-mono" id="duration">—</div>
+  </div>
+</div>
+
+<div class="grid grid-cols-2 border border-rule mb-8">
+  <div class="p-5 border-r border-rule">
+    <div class="text-2xs text-ink-muted uppercase tracking-[0.08em] mb-2 font-semibold">Started</div>
+    <div class="text-sm text-ink-light font-mono" id="started-at">{{ (job.started_at or '—')[:19] }}</div>
+  </div>
+  <div class="p-5">
+    <div class="text-2xs text-ink-muted uppercase tracking-[0.08em] mb-2 font-semibold">Completed</div>
+    <div class="text-sm text-ink-light font-mono" id="completed-at">{{ (job.completed_at or '—')[:19] }}</div>
+  </div>
+</div>
+
+<!-- Parameters -->
+{% if job.params %}
+<div class="border border-rule mb-8">
+  <div class="px-5 py-3 border-b border-rule">
+    <div class="text-2xs text-ink-muted uppercase tracking-[0.08em] font-semibold">Parameters</div>
+  </div>
+  <div class="px-5 py-4">
+    <div class="flex flex-wrap gap-x-8 gap-y-2 text-[13px]">
+      {% for key, value in job.params.items() %}
+      <div>
+        <span class="text-ink-muted">{{ key }}:</span>
+        <span class="font-mono text-xs ml-1">{{ value }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Result (succeeded) -->
+<div id="result-section" class="{% if job.status != 'succeeded' %}hidden{% endif %}">
+  <div class="border border-rule mb-8">
+    <div class="px-5 py-3 border-b border-rule">
+      <div class="text-2xs text-ink-muted uppercase tracking-[0.08em] font-semibold">Result</div>
+    </div>
+    <div class="px-5 py-4" id="result-content">
+      {% if job.result %}
+        {% if job.result.md_path %}
+        <div class="flex items-center gap-3 text-[13px] mb-2">
+          <span class="inline-block border border-rule text-ink-muted text-2xs px-1.5 py-0.5 font-semibold tracking-wide">MD</span>
+          <span class="font-mono text-xs text-ink-light">{{ job.result.md_path }}</span>
+          {% set md_filename = job.result.md_path.split('/')[-1] %}
+          <a href="/reports/{{ md_filename }}" class="text-2xs text-ink-muted hover:text-ink uppercase tracking-wide transition-colors ml-auto">View</a>
+        </div>
+        {% endif %}
+        {% if job.result.html_path %}
+        <div class="flex items-center gap-3 text-[13px]">
+          <span class="inline-block bg-ink text-white text-2xs px-1.5 py-0.5 font-semibold tracking-wide">HTML</span>
+          <span class="font-mono text-xs text-ink-light">{{ job.result.html_path }}</span>
+          {% set html_filename = job.result.html_path.split('/')[-1] %}
+          <a href="/reports/{{ html_filename }}" class="text-2xs text-ink-muted hover:text-ink uppercase tracking-wide transition-colors ml-auto">View</a>
+        </div>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Error (failed) -->
+<div id="error-section" class="{% if job.status != 'failed' %}hidden{% endif %}">
+  <div class="border border-red-200 mb-8">
+    <div class="px-5 py-3 border-b border-red-200 bg-red-50">
+      <div class="text-2xs text-red-600 uppercase tracking-[0.08em] font-semibold">Error</div>
+    </div>
+    <div class="px-5 py-4">
+      <pre class="text-[13px] text-red-700 font-mono whitespace-pre-wrap" id="error-content">{{ job.error or '' }}</pre>
+    </div>
+  </div>
+</div>
+
+<!-- Running indicator -->
+<div id="running-indicator" class="{% if job.status not in ('queued', 'running') %}hidden{% endif %}">
+  <div class="border border-blue-200 p-8 text-center mb-8">
+    <div class="inline-block w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mb-3"></div>
+    <div class="text-sm text-ink-muted">Job is running, auto-refreshing...</div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const jobId = '{{ job.id }}';
+  let currentStatus = '{{ job.status }}';
+
+  function formatDuration(startedAt, completedAt) {
+    if (!startedAt) return '—';
+    const start = new Date(startedAt);
+    const end = completedAt ? new Date(completedAt) : new Date();
+    const diffMs = end - start;
+    if (diffMs < 0) return '—';
+    const secs = Math.floor(diffMs / 1000);
+    if (secs < 60) return secs + 's';
+    return Math.floor(secs / 60) + 'm ' + (secs % 60) + 's';
+  }
+
+  // 초기 duration 계산
+  const initStarted = '{{ job.started_at or "" }}';
+  const initCompleted = '{{ job.completed_at or "" }}';
+  document.getElementById('duration').textContent = formatDuration(initStarted || null, initCompleted || null);
+
+  // running/queued 상태면 duration 실시간 업데이트 + API 폴링
+  if (currentStatus === 'running' || currentStatus === 'queued') {
+    // Duration 실시간 업데이트
+    let durationInterval = null;
+    if (initStarted) {
+      durationInterval = setInterval(() => {
+        document.getElementById('duration').textContent = formatDuration(initStarted, null);
+      }, 1000);
+    }
+
+    // 3초마다 상태 폴링
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/jobs/' + jobId);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // Duration 업데이트
+        if (data.started_at) {
+          document.getElementById('started-at').textContent = data.started_at.substring(0, 19);
+          document.getElementById('duration').textContent = formatDuration(data.started_at, data.completed_at);
+
+          // running인데 interval 없으면 시작
+          if (!durationInterval && !data.completed_at) {
+            durationInterval = setInterval(() => {
+              document.getElementById('duration').textContent = formatDuration(data.started_at, null);
+            }, 1000);
+          }
+        }
+
+        if (data.completed_at) {
+          document.getElementById('completed-at').textContent = data.completed_at.substring(0, 19);
+        }
+
+        // 완료 상태 전환
+        if (data.status === 'succeeded' || data.status === 'failed') {
+          clearInterval(pollInterval);
+          if (durationInterval) clearInterval(durationInterval);
+
+          // Duration 최종값
+          document.getElementById('duration').textContent = formatDuration(data.started_at, data.completed_at);
+
+          // Running indicator 숨기기
+          document.getElementById('running-indicator').classList.add('hidden');
+
+          // Status badge 업데이트
+          const badge = document.getElementById('status-badge');
+          if (data.status === 'succeeded') {
+            badge.innerHTML = '<span class="inline-block bg-ink text-white text-2xs px-2 py-1 font-semibold tracking-wide uppercase">Succeeded</span>';
+
+            // Result 표시
+            const resultSection = document.getElementById('result-section');
+            resultSection.classList.remove('hidden');
+            if (data.result) {
+              let html = '';
+              if (data.result.md_path) {
+                const mdName = data.result.md_path.split('/').pop();
+                html += '<div class="flex items-center gap-3 text-[13px] mb-2">';
+                html += '<span class="inline-block border border-rule text-ink-muted text-2xs px-1.5 py-0.5 font-semibold tracking-wide">MD</span>';
+                html += '<span class="font-mono text-xs text-ink-light">' + data.result.md_path + '</span>';
+                html += '<a href="/reports/' + mdName + '" class="text-2xs text-ink-muted hover:text-ink uppercase tracking-wide transition-colors ml-auto">View</a>';
+                html += '</div>';
+              }
+              if (data.result.html_path) {
+                const htmlName = data.result.html_path.split('/').pop();
+                html += '<div class="flex items-center gap-3 text-[13px]">';
+                html += '<span class="inline-block bg-ink text-white text-2xs px-1.5 py-0.5 font-semibold tracking-wide">HTML</span>';
+                html += '<span class="font-mono text-xs text-ink-light">' + data.result.html_path + '</span>';
+                html += '<a href="/reports/' + htmlName + '" class="text-2xs text-ink-muted hover:text-ink uppercase tracking-wide transition-colors ml-auto">View</a>';
+                html += '</div>';
+              }
+              document.getElementById('result-content').innerHTML = html;
+            }
+          } else {
+            badge.innerHTML = '<span class="inline-block bg-red-600 text-white text-2xs px-2 py-1 font-semibold tracking-wide uppercase">Failed</span>';
+
+            // Error 표시
+            const errorSection = document.getElementById('error-section');
+            errorSection.classList.remove('hidden');
+            document.getElementById('error-content').textContent = data.error || 'Unknown error';
+          }
+        }
+      } catch (e) {
+        // 네트워크 오류는 무시, 다음 폴링에서 재시도
+      }
+    }, 3000);
+  }
+})();
+</script>
+{% endblock %}

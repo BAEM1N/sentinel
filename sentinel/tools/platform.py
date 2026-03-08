@@ -127,6 +127,31 @@ def manage_annotations(
 
 
 @tool
+def query_audit_log(
+    limit: int = 20,
+    run_id: str = "",
+    tool_name: str = "",
+    mutations_only: bool = False,
+) -> str:
+    """감사 로그를 조회합니다.
+
+    Args:
+        limit: 최대 조회 수
+        run_id: 특정 run_id로 필터
+        tool_name: 도구 이름 필터
+        mutations_only: 변경 작업만 조회
+    """
+    from sentinel.audit import audit_log
+    results = audit_log.query(
+        limit=limit,
+        run_id=run_id or None,
+        tool_name=tool_name or None,
+        mutations_only=mutations_only,
+    )
+    return json.dumps(results, ensure_ascii=False, indent=2, default=str)
+
+
+@tool
 def think_tool(thought: str) -> str:
     """전략적 반성 — 현재 상황을 분석하고 다음 행동을 계획합니다."""
     return f"Reflection recorded: {thought}"

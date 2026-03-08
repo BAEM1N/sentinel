@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Sentinel — {{ prompt.name }}{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex items-baseline justify-between mb-8">
+  <div class="flex items-baseline gap-4">
+    <h1 class="text-[22px] font-bold tracking-[-0.03em]">{{ prompt.name }}</h1>
+    <a href="/prompts" class="text-[13px] text-ink-muted hover:text-ink transition-colors">&larr; Back to Prompts</a>
+  </div>
+  <span class="text-xs text-ink-muted font-mono">{{ versions|length }} versions</span>
+</div>
+
+<div class="grid grid-cols-[220px_1fr] gap-6">
+
+  <!-- Version List (Sidebar) -->
+  <div class="border border-rule overflow-hidden self-start">
+    <div class="px-4 py-2.5 bg-ink text-white text-2xs uppercase tracking-[0.08em] font-semibold">
+      Versions
+    </div>
+    <div class="max-h-[500px] overflow-y-auto">
+      {% for v in versions %}
+      <a href="/prompts/{{ prompt.name }}?version={{ v.version }}"
+         class="block px-4 py-2.5 border-b border-rule last:border-0 hover:bg-ink-wash transition-colors text-[13px] {% if v.version == prompt.version %}bg-ink-wash font-semibold{% endif %}">
+        <div class="flex items-center justify-between">
+          <span class="font-mono text-xs">v{{ v.version }}</span>
+          <div class="flex gap-1">
+            {% for label in (v.labels or []) %}
+              {% if label == 'production' %}
+                <span class="inline-block bg-ink text-white text-2xs px-1 py-0 font-semibold tracking-wide">{{ label }}</span>
+              {% else %}
+                <span class="inline-block border border-rule text-ink-muted text-2xs px-1 py-0 font-semibold tracking-wide">{{ label }}</span>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+        {% if v.created_at %}
+        <div class="text-2xs text-ink-faint mt-1 font-mono">{{ v.created_at }}</div>
+        {% endif %}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Prompt Content -->
+  <div>
+    <!-- Current Version Info -->
+    <div class="border border-rule mb-4">
+      <div class="px-4 py-2.5 bg-ink text-white text-2xs uppercase tracking-[0.08em] font-semibold flex items-center justify-between">
+        <span>Prompt Content</span>
+        <div class="flex items-center gap-2">
+          <span class="font-mono normal-case text-xs">v{{ prompt.version }}</span>
+          {% for label in (prompt.labels or []) %}
+            {% if label == 'production' %}
+              <span class="inline-block bg-white text-ink text-2xs px-1.5 py-0 font-semibold tracking-wide">{{ label }}</span>
+            {% else %}
+              <span class="inline-block border border-white/40 text-white/80 text-2xs px-1.5 py-0 font-semibold tracking-wide">{{ label }}</span>
+            {% endif %}
+          {% endfor %}
+          <span class="inline-block border border-white/40 text-white/80 text-2xs px-1.5 py-0 font-semibold tracking-wide uppercase">{{ prompt.type }}</span>
+        </div>
+      </div>
+      <div class="p-4 bg-ink-wash overflow-auto max-h-[500px]">
+        <pre class="text-[13px] font-mono whitespace-pre-wrap break-words leading-relaxed">{{ prompt.prompt }}</pre>
+      </div>
+    </div>
+
+    <!-- Compare Section -->
+    {% if versions|length > 1 %}
+    <div class="border border-rule">
+      <div class="px-4 py-2.5 text-[13px] font-semibold text-ink-light border-b border-rule bg-ink-wash">
+        Compare Versions
+      </div>
+      <form method="get" action="/prompts/{{ prompt.name }}/compare" class="px-4 py-4 flex items-end gap-4">
+        <div>
+          <label class="block text-2xs text-ink-muted uppercase tracking-[0.06em] mb-1.5">Version A</label>
+          <select name="v1" class="border border-rule rounded-none px-3 py-[7px] text-[13px] bg-white font-mono">
+            {% for v in versions %}
+            <option value="{{ v.version }}">v{{ v.version }}{% for l in (v.labels or []) %} [{{ l }}]{% endfor %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-2xs text-ink-muted uppercase tracking-[0.06em] mb-1.5">Version B</label>
+          <select name="v2" class="border border-rule rounded-none px-3 py-[7px] text-[13px] bg-white font-mono">
+            {% for v in versions %}
+            <option value="{{ v.version }}" {% if loop.index == 2 %}selected{% endif %}>v{{ v.version }}{% for l in (v.labels or []) %} [{{ l }}]{% endfor %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="bg-ink text-white px-5 py-[7px] text-[13px] font-medium hover:bg-ink-light transition-colors">
+          Compare
+        </button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+{% endblock %}

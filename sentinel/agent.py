@@ -9,7 +9,7 @@ from langchain.agents.middleware import (
     ModelFallbackMiddleware,
     SummarizationMiddleware,
 )
-from langgraph.checkpoint.memory import InMemorySaver
+from sentinel.checkpoint import create_checkpointer
 
 from sentinel.config import model, _create_model, _PROVIDER_FALLBACK_DEFAULTS
 from sentinel.prompts import SENTINEL_SYSTEM_PROMPT
@@ -45,7 +45,7 @@ def create_sentinel_agent():
         system_prompt=SENTINEL_SYSTEM_PROMPT,
         backend=FilesystemBackend(root_dir=REPORTS_DIR, virtual_mode=True),
         skills=[SKILLS_DIR],
-        checkpointer=InMemorySaver(),
+        checkpointer=create_checkpointer(),
         middleware=[
             SummarizationMiddleware(model=model, trigger=("messages", 15)),
             ModelCallLimitMiddleware(run_limit=RUN_LIMIT),

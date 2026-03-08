@@ -7,3 +7,4 @@ dist/
 reports/*.md
 reports/*.html
 !reports/.gitkeep
+.sentinel/

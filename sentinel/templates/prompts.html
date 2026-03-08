@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Sentinel — Prompt Registry{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex items-baseline justify-between mb-8">
+  <h1 class="text-[22px] font-bold tracking-[-0.03em]">Prompt Registry</h1>
+  <span class="text-xs text-ink-muted font-mono">{{ prompts|length }} prompts</span>
+</div>
+
+<!-- Table -->
+{% if prompts %}
+<div class="border border-rule overflow-hidden">
+  <table class="w-full text-[13px]">
+    <thead>
+      <tr class="bg-ink text-white text-2xs uppercase tracking-[0.08em]">
+        <th class="text-left px-4 py-2.5 font-semibold">Name</th>
+        <th class="text-left px-4 py-2.5 font-semibold w-28">Latest Version</th>
+        <th class="text-left px-4 py-2.5 font-semibold">Labels</th>
+        <th class="text-left px-4 py-2.5 font-semibold w-20">Type</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in prompts %}
+      <tr class="border-b border-rule last:border-0 hover:bg-ink-wash transition-colors cursor-pointer row-animate"
+          style="animation-delay: {{ loop.index0 * 25 }}ms"
+          onclick="window.location='/prompts/{{ p.name }}'">
+        <td class="px-4 py-2.5 font-medium">{{ p.name }}</td>
+        <td class="px-4 py-2.5 text-ink-muted font-mono text-xs">
+          {% if p.version is not none %}v{{ p.version }}{% else %}—{% endif %}
+        </td>
+        <td class="px-4 py-2.5">
+          <div class="flex flex-wrap gap-1">
+            {% for label in (p.labels or []) %}
+              {% if label == 'production' %}
+                <span class="inline-block bg-ink text-white text-2xs px-1.5 py-0.5 font-semibold tracking-wide">{{ label }}</span>
+              {% else %}
+                <span class="inline-block border border-rule text-ink-muted text-2xs px-1.5 py-0.5 font-semibold tracking-wide">{{ label }}</span>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </td>
+        <td class="px-4 py-2.5">
+          <span class="inline-block border border-rule text-ink-muted text-2xs px-1.5 py-0.5 font-semibold tracking-wide uppercase">{{ p.type }}</span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="border border-rule p-12 text-center">
+  <div class="text-ink-muted text-sm">No prompts found.</div>
+  <div class="text-ink-faint text-xs mt-1">Check your Langfuse connection or create prompts in Langfuse.</div>
+</div>
+{% endif %}
+
+{% endblock %}

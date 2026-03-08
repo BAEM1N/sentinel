@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}Sentinel — {{ trace.name or 'Trace' }}{% endblock %}
+
+{% block head %}
+<style>
+  .toggle-btn { cursor: pointer; user-select: none; }
+  .toggle-btn:hover { color: #111; }
+  .collapsible { overflow: hidden; transition: max-height 0.25s ease-out; max-height: 0; }
+  .collapsible.open { max-height: 2000px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Back link + Header -->
+<div class="mb-8">
+  <a href="/traces{% if back_query %}?{{ back_query }}{% endif %}" class="text-[13px] text-ink-muted hover:text-ink transition-colors">
+    &larr; Back to Traces
+  </a>
+  <div class="mt-3 flex items-baseline gap-3">
+    <h1 class="text-[22px] font-bold tracking-[-0.03em]">{{ trace.name or 'Unnamed Trace' }}</h1>
+    <span class="text-xs text-ink-faint font-mono">{{ trace.id }}</span>
+  </div>
+</div>
+
+<!-- KPI Strip -->
+<div class="grid grid-cols-4 border border-rule mb-8">
+  <div class="p-5 border-r border-rule">
+    <div class="text-[28px] font-bold tracking-[-0.04em] leading-none font-mono">
+      {% if trace.latency is not none %}{{ "%.2f"|format(trace.latency) }}<span class="text-sm text-ink-muted font-sans">s</span>{% else %}—{% endif %}
+    </div>
+    <div class="text-2xs text-ink-muted uppercase tracking-[0.08em] mt-2">Latency</div>
+  </div>
+  <div class="p-5 border-r border-rule">
+    <div class="text-[28px] font-bold tracking-[-0.04em] leading-none font-mono">
+      {% if trace.total_cost is not none %}${{ "%.4f"|format(trace.total_cost) }}{% else %}—{% endif %}
+    </div>
+    <div class="text-2xs text-ink-muted uppercase tracking-[0.08em] mt-2">Cost</div>
+  </div>
+  <div class="p-5 border-r border-rule">
+    <div class="text-[28px] font-bold tracking-[-0.04em] leading-none font-mono">
+      {{ trace.input_tokens if trace.input_tokens is not none else '—' }}
+    </div>
+    <div class="text-2xs text-ink-muted uppercase tracking-[0.08em] mt-2">Input Tokens</div>
+  </div>
+  <div class="p-5">
+    <div class="text-[28px] font-bold tracking-[-0.04em] leading-none font-mono">
+      {{ trace.output_tokens if trace.output_tokens is not none else '—' }}
+    </div>
+    <div class="text-2xs text-ink-muted uppercase tracking-[0.08em] mt-2">Output Tokens</div>
+  </div>
+</div>
+
+<!-- Metadata -->
+<div class="mb-8">
+  <div class="text-2xs text-ink-muted uppercase tracking-[0.1em] mb-3 font-semibold">Metadata</div>
+  <div class="border border-rule">
+    <div class="grid grid-cols-2 divide-x divide-rule">
+      <div class="p-4 border-b border-rule">
+        <div class="text-2xs text-ink-faint uppercase tracking-[0.06em] mb-1">User ID</div>
+        <div class="text-[13px]">{{ trace.user_id or '—' }}</div>
+      </div>
+      <div class="p-4 border-b border-rule">
+        <div class="text-2xs text-ink-faint uppercase tracking-[0.06em] mb-1">Session ID</div>
+        <div class="text-[13px] font-mono">{{ trace.session_id or '—' }}</div>
+      </div>
+      <div class="p-4 border-b border-rule">
+        <div class="text-2xs text-ink-faint uppercase tracking-[0.06em] mb-1">Timestamp</div>
+        <div class="text-[13px] font-mono">{{ trace.timestamp }}</div>
+      </div>
+      <div class="p-4 border-b border-rule">
+        <div class="text-2xs text-ink-faint uppercase tracking-[0.06em] mb-1">Level</div>
+        <div class="text-[13px]">
+          {% if trace.level == 'ERROR' %}
+            <span class="inline-block bg-red-600 text-white text-2xs px-1.5 py-0.5 font-semibold tracking-wide">ERROR</span>
+          {% elif trace.level == 'WARNING' %}
+            <span class="inline-block bg-yellow-500 text-white text-2xs px-1.5 py-0.5 font-semibold tracking-wide">WARN</span>
+          {% elif trace.level %}
+            <span class="inline-block border border-rule text-ink-muted text-2xs px-1.5 py-0.5 font-semibold tracking-wide">{{ trace.level }}</span>
+          {% else %}
+            —
+          {% endif %}
+        </div>
+      </div>
+      <div class="p-4 border-b border-rule">
+        <div class="text-2xs text-ink-faint uppercase tracking-[0.06em] mb-1">Tags</div>
+        <div class="flex flex-wrap gap-1">
+          {% for tag in (trace.tags or []) %}
+            <span class="inline-block bg-ink-wash border border-rule text-ink-light text-2xs px-1.5 py-0.5 tracking-wide">{{ tag }}</span>
+          {% else %}
+            <span class="text-[13px] text-ink-faint">—</span>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="p-4 border-b border-rule">
+        <div class="text-2xs text-ink-faint uppercase tracking-[0.06em] mb-1">Version</div>
+        <div class="text-[13px] font-mono">{{ trace.version or '—' }}</div>
+      </div>
+      <div class="p-4">
+        <div class="text-2xs text-ink-faint uppercase tracking-[0.06em] mb-1">Environment</div>
+        <div class="text-[13px]">{{ trace.environment or '—' }}</div>
+      </div>
+      <div class="p-4">
+        <div class="text-2xs text-ink-faint uppercase tracking-[0.06em] mb-1">Release</div>
+        <div class="text-[13px] font-mono">{{ trace.release or '—' }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Input -->
+<div class="mb-6">
+  <div class="flex items-center justify-between text-2xs text-ink-muted uppercase tracking-[0.1em] mb-3 font-semibold">
+    <span>Input</span>
+    <button class="toggle-btn text-ink-faint hover:text-ink" onclick="toggleSection('input-content')">Toggle</button>
+  </div>
+  <div id="input-content" class="collapsible open">
+    <div class="border border-rule bg-ink-wash p-4 overflow-auto max-h-[400px]">
+      <pre class="text-[13px] font-mono whitespace-pre-wrap break-words leading-relaxed">{{ trace.input or 'No input data' }}</pre>
+    </div>
+  </div>
+</div>
+
+<!-- Output -->
+<div class="mb-8">
+  <div class="flex items-center justify-between text-2xs text-ink-muted uppercase tracking-[0.1em] mb-3 font-semibold">
+    <span>Output</span>
+    <button class="toggle-btn text-ink-faint hover:text-ink" onclick="toggleSection('output-content')">Toggle</button>
+  </div>
+  <div id="output-content" class="collapsible open">
+    <div class="border border-rule bg-ink-wash p-4 overflow-auto max-h-[400px]">
+      <pre class="text-[13px] font-mono whitespace-pre-wrap break-words leading-relaxed">{{ trace.output or 'No output data' }}</pre>
+    </div>
+  </div>
+</div>
+
+<!-- Observations -->
+{% if trace.observations %}
+<div class="mb-8">
+  <div class="text-2xs text-ink-muted uppercase tracking-[0.1em] mb-3 font-semibold">Observations</div>
+  <div class="border border-rule overflow-hidden">
+    <table class="w-full text-[13px]">
+      <thead>
+        <tr class="bg-ink text-white text-2xs uppercase tracking-[0.08em]">
+          <th class="text-left px-4 py-2.5 font-semibold">Type</th>
+          <th class="text-left px-4 py-2.5 font-semibold">Name</th>
+          <th class="text-left px-4 py-2.5 font-semibold">Model</th>
+          <th class="text-right px-4 py-2.5 font-semibold w-24">Latency</th>
+          <th class="text-center px-4 py-2.5 font-semibold w-20">Level</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in trace.observations %}
+        <tr class="border-b border-rule last:border-0 hover:bg-ink-wash transition-colors row-animate" style="animation-delay: {{ loop.index0 * 25 }}ms">
+          <td class="px-4 py-2.5">
+            <span class="inline-block border border-rule text-ink-muted text-2xs px-1.5 py-0.5 font-semibold tracking-wide uppercase">{{ o.type or '—' }}</span>
+          </td>
+          <td class="px-4 py-2.5 font-medium">{{ o.name or '—' }}</td>
+          <td class="px-4 py-2.5 text-ink-muted font-mono text-xs">{{ o.model or '—' }}</td>
+          <td class="px-4 py-2.5 text-right font-mono text-xs">
+            {% if o.latency is not none %}{{ "%.2f"|format(o.latency) }}s{% else %}—{% endif %}
+          </td>
+          <td class="px-4 py-2.5 text-center">
+            {% if o.level == 'ERROR' %}
+              <span class="inline-block bg-red-600 text-white text-2xs px-1.5 py-0.5 font-semibold tracking-wide">ERROR</span>
+            {% elif o.level == 'WARNING' %}
+              <span class="inline-block bg-yellow-500 text-white text-2xs px-1.5 py-0.5 font-semibold tracking-wide">WARN</span>
+            {% elif o.level %}
+              <span class="inline-block border border-rule text-ink-muted text-2xs px-1.5 py-0.5 font-semibold tracking-wide">{{ o.level }}</span>
+            {% else %}
+              <span class="text-ink-faint text-2xs">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Scores -->
+{% if trace.scores %}
+<div class="mb-8">
+  <div class="text-2xs text-ink-muted uppercase tracking-[0.1em] mb-3 font-semibold">Scores</div>
+  <div class="border border-rule overflow-hidden">
+    <table class="w-full text-[13px]">
+      <thead>
+        <tr class="bg-ink text-white text-2xs uppercase tracking-[0.08em]">
+          <th class="text-left px-4 py-2.5 font-semibold">Name</th>
+          <th class="text-right px-4 py-2.5 font-semibold w-24">Value</th>
+          <th class="text-left px-4 py-2.5 font-semibold">Comment</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in trace.scores %}
+        <tr class="border-b border-rule last:border-0 hover:bg-ink-wash transition-colors row-animate" style="animation-delay: {{ loop.index0 * 25 }}ms">
+          <td class="px-4 py-2.5 font-medium">{{ s.name }}</td>
+          <td class="px-4 py-2.5 text-right font-mono text-xs">{{ s.value }}</td>
+          <td class="px-4 py-2.5 text-ink-muted text-xs max-w-[300px] truncate">{{ s.comment or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Actions -->
+<div class="flex items-center gap-3 pt-4 border-t border-rule">
+  <form method="post" action="/traces/{{ trace.id }}/evaluate" id="evaluate-form">
+    <button type="submit" class="bg-ink text-white px-5 py-[7px] text-[13px] font-medium hover:bg-ink-light transition-colors"
+            onclick="this.disabled=true; this.innerText='Evaluating...'; this.form.submit();">
+      Evaluate
+    </button>
+  </form>
+  <span class="text-ink-faint text-[13px]">Run LLM-as-judge evaluation on this trace</span>
+</div>
+
+<script>
+function toggleSection(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('open');
+}
+</script>
+{% endblock %}

@@ -446,67 +446,21 @@ def generate_report(
         to_ts: 종료 날짜 (ISO8601, 비우면 오늘)
         output_html: True이면 HTML 보고서도 추가 생성
     """
-    now = datetime.utcnow()
-    if not to_ts:
-        to_ts = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-    if not from_ts:
-        delta = {"daily": 1, "weekly": 7, "monthly": 30}.get(period, 1)
-        from_ts = (now - timedelta(days=delta)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    from sentinel.services.report_service import ReportService
 
-    gran = {"daily": "hour", "weekly": "day", "monthly": "week"}.get(period, "day")
-    period_kr = {"daily": "일간", "weekly": "주간", "monthly": "월간"}.get(period, period)
-    date_label = f"{from_ts[:10]} ~ {to_ts[:10]}"
-    generated_at = now.strftime("%Y-%m-%d %H:%M UTC")
-
-    metrics_json, traces_json, scores_json = _collect_report_data(from_ts, to_ts, gran)
-
-    import uuid as _uuid
-    reports_dir = os.environ.get("SENTINEL_REPORTS_DIR", "./reports")
-    os.makedirs(reports_dir, exist_ok=True)
-    saved = []
-    run_id = _uuid.uuid4().hex[:8]
-    file_stem = f"{period}_report_{from_ts[:10]}_{run_id}"
-
-    # --- 1) Markdown 보고서 (항상 생성) ---
-    md_prompt = REPORT_MD_PROMPT.format(
-        period_kr=period_kr, from_ts=from_ts, to_ts=to_ts,
-        date_label=date_label, generated_at=generated_at,
-        metrics_json=metrics_json, traces_json=traces_json,
-        scores_json=scores_json,
+    svc = ReportService()
+    result = svc.generate(
+        period=period,
+        from_ts=from_ts,
+        to_ts=to_ts,
+        output_html=output_html,
     )
-    md_resp = model.invoke(md_prompt)
-    md_content = _strip_code_fence(md_resp.content)
 
-    md_path = os.path.join(reports_dir, f"{file_stem}.md")
-    with open(md_path, "w", encoding="utf-8") as f:
-        f.write(md_content)
-    saved.append(md_path)
+    saved = [result.md_path]
+    if result.html_path:
+        saved.append(result.html_path)
 
-    # --- 2) HTML 보고서 (옵션) ---
-    if output_html:
-        html_prompt = REPORT_HTML_PROMPT.format(
-            period_kr=period_kr, from_ts=from_ts, to_ts=to_ts,
-            date_label=date_label, generated_at=generated_at,
-            metrics_json=metrics_json, traces_json=traces_json,
-            scores_json=scores_json,
-        )
-        html_resp = model.invoke(html_prompt)
-        html_body = _strip_code_fence(html_resp.content)
-
-        template = _load_template()
-        title = f"LLMOps {period_kr} 보고서 — {date_label}"
-        full_html = (
-            template
-            .replace("{{title}}", title)
-            .replace("{{content}}", html_body)
-            .replace("{{generated_at}}", generated_at)
-        )
-
-        html_path = os.path.join(reports_dir, f"{file_stem}.html")
-        with open(html_path, "w", encoding="utf-8") as f:
-            f.write(full_html)
-        saved.append(html_path)
-
-    result = "보고서 저장 완료:\n" + "\n".join(f"  - {p}" for p in saved)
-    result += f"\n\n{md_content}"
-    return result
+    md_content = Path(result.md_path).read_text(encoding="utf-8")
+    summary = "보고서 저장 완료:\n" + "\n".join(f"  - {p}" for p in saved)
+    summary += f"\n\n{md_content}"
+    return summary

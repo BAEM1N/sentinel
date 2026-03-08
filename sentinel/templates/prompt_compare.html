@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Sentinel — Compare {{ prompt_name }}{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex items-baseline justify-between mb-8">
+  <div class="flex items-baseline gap-4">
+    <h1 class="text-[22px] font-bold tracking-[-0.03em]">{{ prompt_name }}</h1>
+    <a href="/prompts/{{ prompt_name }}" class="text-[13px] text-ink-muted hover:text-ink transition-colors">&larr; Back to Detail</a>
+  </div>
+  <span class="text-xs text-ink-muted font-mono">version comparison</span>
+</div>
+
+<!-- Version Selector -->
+<div class="border border-rule mb-6">
+  <div class="px-4 py-2.5 text-[13px] font-semibold text-ink-light border-b border-rule bg-ink-wash">
+    Select Versions
+  </div>
+  <form method="get" action="/prompts/{{ prompt_name }}/compare" class="px-4 py-4 flex items-end gap-4">
+    <div>
+      <label class="block text-2xs text-ink-muted uppercase tracking-[0.06em] mb-1.5">Version A</label>
+      <input type="number" name="v1" value="{{ v1 }}" min="1"
+             class="border border-rule rounded-none px-3 py-[7px] text-[13px] bg-white font-mono w-24">
+    </div>
+    <div>
+      <label class="block text-2xs text-ink-muted uppercase tracking-[0.06em] mb-1.5">Version B</label>
+      <input type="number" name="v2" value="{{ v2 }}" min="1"
+             class="border border-rule rounded-none px-3 py-[7px] text-[13px] bg-white font-mono w-24">
+    </div>
+    <button type="submit" class="bg-ink text-white px-5 py-[7px] text-[13px] font-medium hover:bg-ink-light transition-colors">
+      Compare
+    </button>
+  </form>
+</div>
+
+<!-- Side-by-Side Comparison -->
+{% if left and right %}
+<div class="grid grid-cols-2 gap-4">
+  <!-- Left (Version A) -->
+  <div class="border border-rule overflow-hidden">
+    <div class="px-4 py-2.5 bg-ink text-white text-2xs uppercase tracking-[0.08em] font-semibold flex items-center justify-between">
+      <span class="font-mono normal-case text-xs">v{{ left.version }}</span>
+      <div class="flex gap-1">
+        {% for label in (left.labels or []) %}
+          {% if label == 'production' %}
+            <span class="inline-block bg-white text-ink text-2xs px-1.5 py-0 font-semibold tracking-wide">{{ label }}</span>
+          {% else %}
+            <span class="inline-block border border-white/40 text-white/80 text-2xs px-1.5 py-0 font-semibold tracking-wide">{{ label }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    <div class="p-4 bg-ink-wash overflow-auto max-h-[500px]">
+      <pre class="text-[13px] font-mono whitespace-pre-wrap break-words leading-relaxed">{{ left.prompt }}</pre>
+    </div>
+  </div>
+
+  <!-- Right (Version B) -->
+  <div class="border border-rule overflow-hidden">
+    <div class="px-4 py-2.5 bg-ink text-white text-2xs uppercase tracking-[0.08em] font-semibold flex items-center justify-between">
+      <span class="font-mono normal-case text-xs">v{{ right.version }}</span>
+      <div class="flex gap-1">
+        {% for label in (right.labels or []) %}
+          {% if label == 'production' %}
+            <span class="inline-block bg-white text-ink text-2xs px-1.5 py-0 font-semibold tracking-wide">{{ label }}</span>
+          {% else %}
+            <span class="inline-block border border-white/40 text-white/80 text-2xs px-1.5 py-0 font-semibold tracking-wide">{{ label }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    <div class="p-4 bg-ink-wash overflow-auto max-h-[500px]">
+      <pre class="text-[13px] font-mono whitespace-pre-wrap break-words leading-relaxed">{{ right.prompt }}</pre>
+    </div>
+  </div>
+</div>
+
+{% elif left and not right %}
+<div class="border border-rule p-12 text-center">
+  <div class="text-ink-muted text-sm">Version {{ v2 }} not found.</div>
+  <div class="text-ink-faint text-xs mt-1">Please select a valid version number.</div>
+</div>
+
+{% elif right and not left %}
+<div class="border border-rule p-12 text-center">
+  <div class="text-ink-muted text-sm">Version {{ v1 }} not found.</div>
+  <div class="text-ink-faint text-xs mt-1">Please select a valid version number.</div>
+</div>
+
+{% else %}
+<div class="border border-rule p-12 text-center">
+  <div class="text-ink-muted text-sm">Select two versions to compare.</div>
+  <div class="text-ink-faint text-xs mt-1">Enter version numbers above and click Compare.</div>
+</div>
+{% endif %}
+
+{% endblock %}

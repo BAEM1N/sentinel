@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Sentinel — Jobs{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex items-baseline justify-between mb-8">
+  <h1 class="text-[22px] font-bold tracking-[-0.03em]">Background Jobs</h1>
+  <span class="text-xs text-ink-muted font-mono">{{ jobs|length }} jobs</span>
+</div>
+
+<!-- Table -->
+{% if jobs %}
+<div class="border border-rule overflow-hidden">
+  <table class="w-full text-[13px]">
+    <thead>
+      <tr class="bg-ink text-white text-2xs uppercase tracking-[0.08em]">
+        <th class="text-left px-4 py-2.5 font-semibold">Job ID</th>
+        <th class="text-left px-4 py-2.5 font-semibold">Type</th>
+        <th class="text-left px-4 py-2.5 font-semibold w-28">Status</th>
+        <th class="text-right px-4 py-2.5 font-semibold w-40">Created</th>
+        <th class="text-right px-4 py-2.5 font-semibold w-28">Duration</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for job in jobs %}
+      <tr class="border-b border-rule last:border-0 hover:bg-ink-wash transition-colors cursor-pointer row-animate" style="animation-delay: {{ loop.index0 * 30 }}ms" onclick="window.location='/jobs/{{ job.id }}'">
+        <td class="px-4 py-3 font-mono text-xs font-medium">{{ job.id }}</td>
+        <td class="px-4 py-3 text-ink-light">{{ job.type }}</td>
+        <td class="px-4 py-3">
+          {% if job.status == 'queued' %}
+          <span class="inline-block border border-rule text-ink-muted text-2xs px-1.5 py-0.5 font-semibold tracking-wide uppercase">Queued</span>
+          {% elif job.status == 'running' %}
+          <span class="inline-block border border-blue-400 text-blue-600 text-2xs px-1.5 py-0.5 font-semibold tracking-wide uppercase">Running</span>
+          {% elif job.status == 'succeeded' %}
+          <span class="inline-block bg-ink text-white text-2xs px-1.5 py-0.5 font-semibold tracking-wide uppercase">Succeeded</span>
+          {% elif job.status == 'failed' %}
+          <span class="inline-block bg-red-600 text-white text-2xs px-1.5 py-0.5 font-semibold tracking-wide uppercase">Failed</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 text-right font-mono text-xs text-ink-muted">{{ job.created_at[:19] }}</td>
+        <td class="px-4 py-3 text-right font-mono text-xs text-ink-muted" data-started="{{ job.started_at or '' }}" data-completed="{{ job.completed_at or '' }}" data-status="{{ job.status }}">
+          —
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="border border-rule p-12 text-center">
+  <div class="text-ink-muted text-sm">No background jobs yet.</div>
+  <div class="text-ink-faint text-xs mt-1">Generate a report to create a background job.</div>
+</div>
+{% endif %}
+
+<script>
+// Duration 계산
+document.querySelectorAll('td[data-started]').forEach(td => {
+  const started = td.dataset.started;
+  const completed = td.dataset.completed;
+  const status = td.dataset.status;
+  if (!started) return;
+
+  const startDate = new Date(started);
+  const endDate = completed ? new Date(completed) : new Date();
+  const diffMs = endDate - startDate;
+
+  if (diffMs < 0) return;
+
+  const secs = Math.floor(diffMs / 1000);
+  if (secs < 60) {
+    td.textContent = secs + 's';
+  } else {
+    const mins = Math.floor(secs / 60);
+    const remSecs = secs % 60;
+    td.textContent = mins + 'm ' + remSecs + 's';
+  }
+
+  // running 상태면 계속 업데이트
+  if (status === 'running') {
+    setInterval(() => {
+      const now = new Date();
+      const elapsed = Math.floor((now - startDate) / 1000);
+      if (elapsed < 60) {
+        td.textContent = elapsed + 's';
+      } else {
+        td.textContent = Math.floor(elapsed / 60) + 'm ' + (elapsed % 60) + 's';
+      }
+    }, 1000);
+  }
+});
+</script>
+{% endblock %}

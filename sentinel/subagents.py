@@ -6,7 +6,12 @@ from sentinel.tools.prompt_mgmt import (
     save_langfuse_prompt,
     suggest_prompt_improvement,
 )
-from sentinel.tools.evaluation import create_score, evaluate_with_llm, list_scores
+from sentinel.tools.evaluation import (
+    batch_evaluate,
+    create_score,
+    evaluate_with_llm,
+    list_scores,
+)
 from sentinel.tools.metrics import generate_report, query_metrics
 from sentinel.tools.platform import think_tool
 
@@ -61,6 +66,7 @@ quality_evaluator = {
     ),
     "tools": [
         evaluate_with_llm,
+        batch_evaluate,
         list_scores,
         create_score,
         list_traces,

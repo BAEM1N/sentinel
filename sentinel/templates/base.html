@@ -74,8 +74,12 @@
         <a href="/" class="text-sm font-bold tracking-[-0.02em] uppercase">Sentinel</a>
         <div class="flex gap-5 text-[13px] text-ink-muted">
           <a href="/" class="nav-link hover:text-ink {% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
+          <a href="/traces" class="nav-link hover:text-ink {% if active_page == 'traces' %}active{% endif %}">Traces</a>
+          <a href="/prompts" class="nav-link hover:text-ink {% if active_page == 'prompts' %}active{% endif %}">Prompts</a>
           <a href="/reports" class="nav-link hover:text-ink {% if active_page == 'reports' %}active{% endif %}">Reports</a>
           <a href="/scheduler" class="nav-link hover:text-ink {% if active_page == 'scheduler' %}active{% endif %}">Scheduler</a>
+          <a href="/jobs" class="nav-link hover:text-ink {% if active_page == 'jobs' %}active{% endif %}">Jobs</a>
+          <a href="/audit" class="nav-link hover:text-ink {% if active_page == 'audit' %}active{% endif %}">Audit</a>
         </div>
       </div>
       <div class="text-2xs text-ink-faint tracking-wide uppercase">LLMOps Agent</div>
