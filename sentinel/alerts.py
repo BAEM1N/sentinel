@@ -12,6 +12,11 @@ from typing import Optional
 logger = logging.getLogger("sentinel.alerts")
 
 
+VALID_OPERATORS = {"gt", "lt", "eq"}
+VALID_METRICS = {"latency", "cost", "error_rate", "score"}
+VALID_CHANNELS = {"log", "telegram", "email", "slack"}
+
+
 class AlertRule:
     """알림 규칙 데이터 클래스."""
 
@@ -62,7 +67,7 @@ class AlertRule:
         if self.operator == "lt":
             return value < self.threshold
         if self.operator == "eq":
-            return value == self.threshold
+            return abs(value - self.threshold) < 1e-9
         return False
 
 
@@ -138,6 +143,12 @@ class AlertManager:
         channel: str = "log",
     ) -> AlertRule:
         """알림 규칙 생성."""
+        if operator not in VALID_OPERATORS:
+            raise ValueError(f"잘못된 operator: {operator} (허용: {VALID_OPERATORS})")
+        if metric not in VALID_METRICS:
+            raise ValueError(f"잘못된 metric: {metric} (허용: {VALID_METRICS})")
+        if channel not in VALID_CHANNELS:
+            raise ValueError(f"잘못된 channel: {channel} (허용: {VALID_CHANNELS})")
         self._ensure_initialized()
         now = datetime.now(timezone.utc).isoformat()
         with self._conn() as conn:
@@ -237,35 +248,38 @@ class AlertManager:
                     "operator": rule.operator,
                     "channel": rule.channel,
                 })
-                # 이력 저장
-                with self._conn() as conn:
+
+        # 트리거된 알림 이력을 단일 커넥션으로 일괄 저장
+        if triggered:
+            with self._conn() as conn:
+                for item in triggered:
                     conn.execute(
                         """INSERT INTO alert_history
                            (rule_id, rule_name, metric, value, threshold, operator, channel, status, triggered_at)
                            VALUES (?, ?, ?, ?, ?, ?, ?, 'triggered', ?)""",
                         (
-                            rule.id,
-                            rule.name,
-                            rule.metric,
-                            value,
-                            rule.threshold,
-                            rule.operator,
-                            rule.channel,
+                            item["rule_id"],
+                            item["rule_name"],
+                            item["metric"],
+                            item["value"],
+                            item["threshold"],
+                            item["operator"],
+                            item["channel"],
                             now,
                         ),
                     )
                     conn.execute(
                         "UPDATE alert_rules SET last_triggered_at = ? WHERE id = ?",
-                        (now, rule.id),
+                        (now, item["rule_id"]),
                     )
-                logger.info(
-                    "Alert triggered: %s — %s %s %s (actual: %s)",
-                    rule.name,
-                    rule.metric,
-                    rule.operator,
-                    rule.threshold,
-                    value,
-                )
+                    logger.info(
+                        "Alert triggered: %s — %s %s %s (actual: %s)",
+                        item["rule_name"],
+                        item["metric"],
+                        item["operator"],
+                        item["threshold"],
+                        item["value"],
+                    )
 
         return triggered
 

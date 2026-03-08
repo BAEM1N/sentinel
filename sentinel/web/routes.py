@@ -73,7 +73,6 @@ async def page_reports(request: Request):
 @router.get("/reports/{filename}", response_class=HTMLResponse)
 async def page_report_view(request: Request, filename: str):
     """보고서 상세 보기."""
-    import json
     from sentinel.approval import approval_manager
 
     reports_base = Path(REPORTS_DIR).resolve()
@@ -89,16 +88,13 @@ async def page_report_view(request: Request, filename: str):
 
     # 이 보고서에 대한 승인 상태 확인
     approval_status = None
-    all_approvals = approval_manager.list_all(limit=500)
-    for item in all_approvals:
-        if item.get("request_type") != "report_publish":
-            continue
-        params = json.loads(item["params_json"]) if item.get("params_json") else {}
-        md_basename = os.path.basename(params.get("md_path", ""))
-        html_basename = os.path.basename(params.get("html_path", "")) if params.get("html_path") else ""
-        if md_basename == filename or html_basename == filename:
-            approval_status = item["status"]
-            break
+    matched_approval = approval_manager.find_by_type_and_param(
+        request_type="report_publish",
+        param_key="md_path",
+        param_value=filename,
+    )
+    if matched_approval:
+        approval_status = matched_approval["status"]
 
     return request.app.state.templates.TemplateResponse("report_view.html", {
         "request": request,
@@ -113,30 +109,25 @@ async def page_report_view(request: Request, filename: str):
 @router.post("/reports/{filename}/publish")
 async def action_publish_report(request: Request, filename: str):
     """승인된 보고서를 발행(알림 전송)합니다."""
-    import json
     from sentinel.approval import approval_manager, ApprovalStatus
 
     # 해당 보고서에 대한 승인 요청 검색
-    all_items = approval_manager.list_all(limit=500, status_filter=ApprovalStatus.APPROVED.value)
-    matched = None
-    for item in all_items:
-        if item.get("request_type") != "report_publish":
-            continue
-        params = json.loads(item["params_json"]) if item.get("params_json") else {}
-        md_basename = os.path.basename(params.get("md_path", ""))
-        html_basename = os.path.basename(params.get("html_path", "")) if params.get("html_path") else ""
-        if md_basename == filename or html_basename == filename:
-            matched = params
-            break
-
-    if not matched:
+    matched_item = approval_manager.find_by_type_and_param(
+        request_type="report_publish",
+        param_key="md_path",
+        param_value=filename,
+        status_filter=ApprovalStatus.APPROVED.value,
+    )
+    if not matched_item:
         return HTMLResponse("<h1>승인되지 않은 보고서입니다.</h1>", status_code=403)
 
     # 승인 확인 → 알림 전송
     from sentinel.web.notify import send_report
 
-    md_path = matched.get("md_path", "")
-    html_path = matched.get("html_path")
+    import json as _json
+    params = _json.loads(matched_item["params_json"]) if matched_item.get("params_json") else {}
+    md_path = params.get("md_path", "")
+    html_path = params.get("html_path")
     send_report(md_path, html_path)
 
     return RedirectResponse(url=f"/reports/{filename}", status_code=303)
@@ -572,7 +563,9 @@ async def action_approve(approval_id: str, decided_by: str = Form(""), reason: s
     """승인 처리 후 목록 페이지로 리다이렉트."""
     from sentinel.approval import approval_manager
 
-    approval_manager.approve(approval_id, decided_by=decided_by, reason=reason)
+    if not decided_by or not decided_by.strip():
+        return HTMLResponse("<h1>승인자(decided_by)를 입력해주세요.</h1>", status_code=400)
+    approval_manager.approve(approval_id, decided_by=decided_by.strip(), reason=reason)
     return RedirectResponse(url="/approvals", status_code=303)
 
 
@@ -581,7 +574,9 @@ async def action_reject(approval_id: str, decided_by: str = Form(""), reason: st
     """거절 처리 후 목록 페이지로 리다이렉트."""
     from sentinel.approval import approval_manager
 
-    approval_manager.reject(approval_id, decided_by=decided_by, reason=reason)
+    if not decided_by or not decided_by.strip():
+        return HTMLResponse("<h1>처리자(decided_by)를 입력해주세요.</h1>", status_code=400)
+    approval_manager.reject(approval_id, decided_by=decided_by.strip(), reason=reason)
     return RedirectResponse(url="/approvals", status_code=303)
 
 
@@ -693,6 +688,7 @@ async def page_eval(request: Request):
         "type_count": len(score_groups),
         "active_page": "eval",
         "api_error": api_error,
+        "data_note": "최근 200건 스코어 기준",
     })
 
 
@@ -741,6 +737,7 @@ async def page_reviews(request: Request, threshold: float = Query(0.5, ge=0.0, l
         "threshold": threshold,
         "active_page": "reviews",
         "api_error": api_error,
+        "data_note": "최근 100건 스코어 기준",
     })
 
 
@@ -794,13 +791,16 @@ async def create_alert_rule(
     """새 알림 규칙 생성."""
     from sentinel.alerts import alert_manager
 
-    alert_manager.create_rule(
-        name=name,
-        metric=metric,
-        operator=operator,
-        threshold=threshold,
-        channel=channel,
-    )
+    try:
+        alert_manager.create_rule(
+            name=name,
+            metric=metric,
+            operator=operator,
+            threshold=threshold,
+            channel=channel,
+        )
+    except ValueError as e:
+        return HTMLResponse(f"<h1>입력 오류: {e}</h1>", status_code=400)
     return RedirectResponse(url="/alerts", status_code=303)
 
 
@@ -838,17 +838,10 @@ async def page_datasets(request: Request):
         res = lf_client.api.datasets.list()
         data = res.data if hasattr(res, "data") else res
         for ds in data:
-            item_count = 0
-            try:
-                items_res = lf_client.api.dataset_items.list(dataset_name=ds.name)
-                items_data = items_res.data if hasattr(items_res, "data") else items_res
-                item_count = len(items_data)
-            except Exception:
-                pass
             datasets.append({
                 "name": ds.name,
                 "description": getattr(ds, "description", None),
-                "item_count": item_count,
+                "item_count": getattr(ds, "item_count", None),
                 "created_at": str(getattr(ds, "created_at", ""))[:19],
             })
     except Exception as e:
@@ -874,8 +867,9 @@ async def create_dataset(
 
     try:
         lf_client.api.datasets.create(name=name, description=description)
-    except Exception:
+    except Exception as e:
         logger.exception("데이터셋 생성 실패: %s", name)
+        return HTMLResponse(f"<h1>데이터셋 생성 실패: {e}</h1>", status_code=500)
 
     return RedirectResponse(url="/datasets", status_code=303)
 
@@ -951,8 +945,9 @@ async def add_dataset_item(
             expected_output=trace_output,
             source_trace_id=trace_id,
         )
-    except Exception:
+    except Exception as e:
         logger.exception("데이터셋 아이템 추가 실패: %s / trace %s", dataset_name, trace_id)
+        return HTMLResponse(f"<h1>아이템 추가 실패: {e}</h1>", status_code=500)
 
     return RedirectResponse(url=f"/datasets/{dataset_name}", status_code=303)
 

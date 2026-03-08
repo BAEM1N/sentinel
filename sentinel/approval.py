@@ -193,6 +193,38 @@ class ApprovalManager:
             rows = conn.execute(sql, params).fetchall()
             return [dict(row) for row in rows]
 
+    def find_by_type_and_param(
+        self,
+        request_type: str,
+        param_key: str,
+        param_value: str,
+        status_filter: str | None = None,
+    ) -> dict | None:
+        """request_type과 params_json 내 특정 키-값으로 승인 요청을 검색합니다."""
+        self._ensure_initialized()
+        sql = "SELECT * FROM approvals WHERE request_type = ?"
+        params: list = [request_type]
+        if status_filter:
+            sql += " AND status = ?"
+            params.append(status_filter)
+        sql += " ORDER BY requested_at DESC"
+
+        with self._conn() as conn:
+            rows = conn.execute(sql, params).fetchall()
+            for row in rows:
+                row_dict = dict(row)
+                if row_dict.get("params_json"):
+                    try:
+                        p = json.loads(row_dict["params_json"])
+                        if param_value in (
+                            os.path.basename(p.get("md_path", "")),
+                            os.path.basename(p.get("html_path", "")) if p.get("html_path") else "",
+                        ):
+                            return row_dict
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+        return None
+
     def expire_old(self) -> int:
         """만료된 대기 항목을 expired 상태로 변경합니다. 변경 건수를 반환합니다."""
         self._ensure_initialized()
