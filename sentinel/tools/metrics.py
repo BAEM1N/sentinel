@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from langchain.tools import tool
@@ -16,7 +16,7 @@ logger = logging.getLogger("sentinel.tools.metrics")
 
 def _default_range(days_back: int = 7):
     """기본 날짜 범위를 반환합니다."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     return (
         (now - timedelta(days=days_back)).strftime("%Y-%m-%dT%H:%M:%SZ"),
         now.strftime("%Y-%m-%dT%H:%M:%SZ"),

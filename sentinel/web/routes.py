@@ -5,6 +5,7 @@ import os
 import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+from html import escape as html_escape
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -800,7 +801,7 @@ async def create_alert_rule(
             channel=channel,
         )
     except ValueError as e:
-        return HTMLResponse(f"<h1>입력 오류: {e}</h1>", status_code=400)
+        return HTMLResponse(f"<h1>입력 오류: {html_escape(str(e))}</h1>", status_code=400)
     return RedirectResponse(url="/alerts", status_code=303)
 
 
@@ -869,7 +870,7 @@ async def create_dataset(
         lf_client.api.datasets.create(name=name, description=description)
     except Exception as e:
         logger.exception("데이터셋 생성 실패: %s", name)
-        return HTMLResponse(f"<h1>데이터셋 생성 실패: {e}</h1>", status_code=500)
+        return HTMLResponse(f"<h1>데이터셋 생성 실패: {html_escape(str(e))}</h1>", status_code=500)
 
     return RedirectResponse(url="/datasets", status_code=303)
 
@@ -947,7 +948,7 @@ async def add_dataset_item(
         )
     except Exception as e:
         logger.exception("데이터셋 아이템 추가 실패: %s / trace %s", dataset_name, trace_id)
-        return HTMLResponse(f"<h1>아이템 추가 실패: {e}</h1>", status_code=500)
+        return HTMLResponse(f"<h1>아이템 추가 실패: {html_escape(str(e))}</h1>", status_code=500)
 
     return RedirectResponse(url=f"/datasets/{dataset_name}", status_code=303)
 
@@ -1007,7 +1008,7 @@ async def create_playbook(
     try:
         playbook_manager.create(name=name, description=description, steps=steps)
     except ValueError as e:
-        return HTMLResponse(f"<h1>입력 오류: {e}</h1>", status_code=400)
+        return HTMLResponse(f"<h1>입력 오류: {html_escape(str(e))}</h1>", status_code=400)
     return RedirectResponse(url="/playbooks", status_code=303)
 
 
