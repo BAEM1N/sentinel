@@ -49,10 +49,9 @@
 
       <!-- Approve / Reject Forms -->
       <div class="flex gap-3 items-end border-t border-rule pt-4">
-        <div class="flex-1">
-          <label class="block text-2xs text-ink-muted uppercase tracking-[0.06em] mb-1.5">Decided By</label>
-          <input type="text" id="decided_by_{{ req.id }}" placeholder="name"
-                 class="border border-rule rounded-none px-3 py-[7px] text-[13px] bg-white w-full" />
+        <div class="flex-1 flex items-center gap-2 text-2xs text-ink-muted">
+          <span class="uppercase tracking-[0.06em]">Deciding as</span>
+          <span class="font-mono text-ink font-semibold">{{ request.state.user }}</span>
         </div>
         <div class="flex-[2]">
           <label class="block text-2xs text-ink-muted uppercase tracking-[0.06em] mb-1.5">Reason</label>
@@ -60,8 +59,8 @@
                  class="border border-rule rounded-none px-3 py-[7px] text-[13px] bg-white w-full" />
         </div>
         <form action="/approvals/{{ req.id }}/approve" method="post" class="flex-shrink-0"
-              onsubmit="return fillHiddenFields(this, '{{ req.id }}')">
-          <input type="hidden" name="decided_by" />
+              onsubmit="return fillReason(this, '{{ req.id }}')">
+          <input type="hidden" name="_csrf_token" value="{{ request.state.csrf_token }}" />
           <input type="hidden" name="reason" />
           <button type="submit"
                   class="bg-ink text-white px-5 py-[7px] text-[13px] font-medium hover:bg-ink-light transition-colors">
@@ -69,8 +68,8 @@
           </button>
         </form>
         <form action="/approvals/{{ req.id }}/reject" method="post" class="flex-shrink-0"
-              onsubmit="return fillHiddenFields(this, '{{ req.id }}')">
-          <input type="hidden" name="decided_by" />
+              onsubmit="return fillReason(this, '{{ req.id }}')">
+          <input type="hidden" name="_csrf_token" value="{{ request.state.csrf_token }}" />
           <input type="hidden" name="reason" />
           <button type="submit"
                   class="border border-rule text-ink px-5 py-[7px] text-[13px] font-medium hover:bg-ink-wash transition-colors">
@@ -137,15 +136,8 @@
 </div>
 
 <script>
-function fillHiddenFields(form, reqId) {
-  var decidedBy = document.getElementById('decided_by_' + reqId).value.trim();
-  if (!decidedBy) {
-    alert('Decided By is required.');
-    document.getElementById('decided_by_' + reqId).focus();
-    return false;
-  }
+function fillReason(form, reqId) {
   var reason = document.getElementById('reason_' + reqId).value.trim();
-  form.querySelector('input[name="decided_by"]').value = decidedBy;
   form.querySelector('input[name="reason"]').value = reason;
   return true;
 }

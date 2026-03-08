@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sentinel — Sign In</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Pretendard Variable"', 'Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Helvetica Neue', 'sans-serif'],
+          },
+          colors: {
+            ink: { DEFAULT: '#111', light: '#444', muted: '#888', faint: '#bbb', wash: '#f7f7f7' },
+            rule: { DEFAULT: '#e0e0e0' },
+          },
+          fontSize: {
+            '2xs': ['0.65rem', { lineHeight: '1' }],
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    * { font-feature-settings: 'ss01', 'cv11'; }
+    body { -webkit-font-smoothing: antialiased; }
+    select:focus, input:focus { border-color: #111 !important; outline: none; }
+  </style>
+</head>
+<body class="bg-white text-ink font-sans min-h-screen flex items-center justify-center">
+  <div class="w-full max-w-[340px] px-6">
+    <h1 class="text-center text-sm font-bold tracking-[-0.02em] uppercase mb-8">Sentinel</h1>
+
+    {% if error %}
+    <div class="border border-red-200 bg-red-50 px-4 py-2.5 mb-6 text-[13px] text-red-700">
+      {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="post" action="/login">
+      <div class="mb-4">
+        <label class="block text-2xs text-ink-muted uppercase tracking-[0.06em] mb-1.5 font-semibold">Username</label>
+        <input type="text" name="username" required autofocus
+               class="w-full border border-rule px-3 py-[7px] text-[13px] bg-white" />
+      </div>
+      <div class="mb-6">
+        <label class="block text-2xs text-ink-muted uppercase tracking-[0.06em] mb-1.5 font-semibold">Password</label>
+        <input type="password" name="password" required
+               class="w-full border border-rule px-3 py-[7px] text-[13px] bg-white" />
+      </div>
+      <button type="submit"
+              class="w-full bg-ink text-white py-[7px] text-[13px] font-medium hover:bg-ink-light transition-colors">
+        Sign In
+      </button>
+    </form>
+
+    <div class="text-center mt-8">
+      <span class="text-2xs text-ink-faint">Sentinel v0.0.1</span>
+    </div>
+  </div>
+</body>
+</html>

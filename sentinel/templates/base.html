@@ -86,7 +86,16 @@
           <a href="/audit" class="nav-link hover:text-ink {% if active_page == 'audit' %}active{% endif %}">Audit</a>
         </div>
       </div>
-      <a href="/settings" class="text-2xs text-ink-faint tracking-wide uppercase hover:text-ink transition-colors {% if active_page == 'settings' %}text-ink{% endif %}">Settings</a>
+      <div class="flex items-center gap-4">
+        <a href="/settings" class="text-2xs text-ink-faint tracking-wide uppercase hover:text-ink transition-colors {% if active_page == 'settings' %}text-ink{% endif %}">Settings</a>
+        {% if request.state.user %}
+        <span class="text-2xs text-ink-muted font-mono">{{ request.state.user }}</span>
+        <form action="/logout" method="post" class="inline">
+          <input type="hidden" name="_csrf_token" value="{{ request.state.csrf_token }}" />
+          <button type="submit" class="text-2xs text-ink-faint hover:text-ink transition-colors uppercase tracking-wide">Logout</button>
+        </form>
+        {% endif %}
+      </div>
     </div>
   </nav>
 

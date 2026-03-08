@@ -82,6 +82,7 @@
       <div class="border-t border-rule pt-3 mt-3
                   {% if s.value <= 0.3 %}border-red-200{% elif s.value <= 0.5 %}border-yellow-200{% endif %}">
         <form action="/reviews/{{ s.trace_id }}/acknowledge" method="post">
+          <input type="hidden" name="_csrf_token" value="{{ request.state.csrf_token }}" />
           <button type="submit"
                   class="bg-ink text-white px-5 py-[7px] text-[13px] font-medium hover:bg-ink-light transition-colors">
             검토 완료

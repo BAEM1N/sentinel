@@ -41,6 +41,61 @@ def _list_reports() -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# 인증 (Login / Logout)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/login", response_class=HTMLResponse)
+async def page_login(request: Request):
+    """로그인 페이지."""
+    return request.app.state.templates.TemplateResponse("login.html", {
+        "request": request,
+        "error": "",
+    })
+
+
+@router.post("/login")
+async def action_login(request: Request, username: str = Form(...), password: str = Form(...)):
+    """로그인 처리."""
+    from sentinel.auth import verify_credentials, session_manager
+
+    if not verify_credentials(username, password):
+        return request.app.state.templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Invalid username or password.",
+        }, status_code=401)
+
+    # 세션 고정 방어 — 이전 세션 삭제
+    old_session_id = request.cookies.get("sentinel_session")
+    if old_session_id:
+        session_manager.delete_session(old_session_id)
+
+    session = session_manager.create_session(username)
+    response = RedirectResponse(url="/", status_code=303)
+    response.set_cookie(
+        key="sentinel_session",
+        value=session["session_id"],
+        httponly=True,
+        samesite="lax",
+        max_age=24 * 3600,
+    )
+    return response
+
+
+@router.post("/logout")
+async def action_logout(request: Request):
+    """로그아웃 처리."""
+    from sentinel.auth import session_manager
+
+    session_id = request.cookies.get("sentinel_session")
+    if session_id:
+        session_manager.delete_session(session_id)
+    response = RedirectResponse(url="/login", status_code=303)
+    response.delete_cookie("sentinel_session")
+    return response
+
+
+# ---------------------------------------------------------------------------
 # 페이지 라우트
 # ---------------------------------------------------------------------------
 
@@ -560,24 +615,22 @@ async def page_approvals(request: Request):
 
 
 @router.post("/approvals/{approval_id}/approve")
-async def action_approve(approval_id: str, decided_by: str = Form(""), reason: str = Form("")):
-    """승인 처리 후 목록 페이지로 리다이렉트."""
+async def action_approve(request: Request, approval_id: str, reason: str = Form("")):
+    """승인 처리 후 목록 페이지로 리다이렉트. decided_by는 세션에서 자동 설정."""
     from sentinel.approval import approval_manager
 
-    if not decided_by or not decided_by.strip():
-        return HTMLResponse("<h1>승인자(decided_by)를 입력해주세요.</h1>", status_code=400)
-    approval_manager.approve(approval_id, decided_by=decided_by.strip(), reason=reason)
+    decided_by = getattr(request.state, "user", None) or "unknown"
+    approval_manager.approve(approval_id, decided_by=decided_by, reason=reason)
     return RedirectResponse(url="/approvals", status_code=303)
 
 
 @router.post("/approvals/{approval_id}/reject")
-async def action_reject(approval_id: str, decided_by: str = Form(""), reason: str = Form("")):
-    """거절 처리 후 목록 페이지로 리다이렉트."""
+async def action_reject(request: Request, approval_id: str, reason: str = Form("")):
+    """거절 처리 후 목록 페이지로 리다이렉트. decided_by는 세션에서 자동 설정."""
     from sentinel.approval import approval_manager
 
-    if not decided_by or not decided_by.strip():
-        return HTMLResponse("<h1>처리자(decided_by)를 입력해주세요.</h1>", status_code=400)
-    approval_manager.reject(approval_id, decided_by=decided_by.strip(), reason=reason)
+    decided_by = getattr(request.state, "user", None) or "unknown"
+    approval_manager.reject(approval_id, decided_by=decided_by, reason=reason)
     return RedirectResponse(url="/approvals", status_code=303)
 
 

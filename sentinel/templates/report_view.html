@@ -79,6 +79,7 @@
   <div class="flex items-center gap-2 flex-shrink-0">
     {% if approval_status == "approved" %}
     <form method="post" action="/reports/{{ filename }}/publish" onsubmit="return confirm('승인된 보고서를 발행하시겠습니까?');">
+      <input type="hidden" name="_csrf_token" value="{{ request.state.csrf_token }}" />
       <button type="submit"
               class="text-[13px] bg-ink text-white px-4 py-1.5 hover:bg-ink-muted transition-colors">
         Publish

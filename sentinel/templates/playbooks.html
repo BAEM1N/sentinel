@@ -12,6 +12,7 @@
 <div class="border border-rule p-5 mb-8">
   <div class="text-2xs text-ink-muted uppercase tracking-[0.08em] mb-4 font-semibold">New Playbook</div>
   <form action="/playbooks" method="post">
+    <input type="hidden" name="_csrf_token" value="{{ request.state.csrf_token }}" />
     <div class="grid grid-cols-2 gap-3 mb-3">
       <div>
         <label class="block text-2xs text-ink-muted uppercase tracking-[0.08em] mb-1.5 font-semibold">Name</label>
@@ -74,6 +75,7 @@
         <td class="px-4 py-3 text-right">
           <div class="flex items-center justify-end gap-3">
             <form action="/playbooks/{{ pb.id }}/run" method="post" class="inline">
+              <input type="hidden" name="_csrf_token" value="{{ request.state.csrf_token }}" />
               <button type="submit"
                       class="text-2xs text-ink-muted hover:text-ink uppercase tracking-[0.08em] font-semibold transition-colors">
                 Run
@@ -81,6 +83,7 @@
             </form>
             <form action="/playbooks/{{ pb.id }}/delete" method="post" class="inline"
                   onsubmit="return confirm('Delete this playbook?')">
+              <input type="hidden" name="_csrf_token" value="{{ request.state.csrf_token }}" />
               <button type="submit"
                       class="text-2xs text-ink-faint hover:text-red-600 uppercase tracking-[0.08em] font-semibold transition-colors">
                 Delete

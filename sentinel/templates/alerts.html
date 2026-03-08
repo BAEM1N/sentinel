@@ -12,6 +12,7 @@
 <div class="border border-rule p-5 mb-8">
   <div class="text-2xs text-ink-muted uppercase tracking-[0.08em] mb-4 font-semibold">New Alert Rule</div>
   <form action="/alerts/rules" method="post">
+    <input type="hidden" name="_csrf_token" value="{{ request.state.csrf_token }}" />
     <div class="grid grid-cols-5 gap-3">
       <div>
         <label class="block text-2xs text-ink-muted uppercase tracking-[0.08em] mb-1.5 font-semibold">Name</label>
@@ -91,6 +92,7 @@
         </td>
         <td class="px-4 py-3 text-center">
           <form action="/alerts/rules/{{ rule.id }}/toggle" method="post" class="inline">
+            <input type="hidden" name="_csrf_token" value="{{ request.state.csrf_token }}" />
             <button type="submit" class="group" title="Toggle enabled">
               {% if rule.enabled %}
               <span class="inline-block w-8 h-4 rounded-full bg-ink relative transition-colors">
@@ -107,6 +109,7 @@
         <td class="px-4 py-3 text-right">
           <form action="/alerts/rules/{{ rule.id }}/delete" method="post" class="inline"
                 onsubmit="return confirm('Delete this rule?')">
+            <input type="hidden" name="_csrf_token" value="{{ request.state.csrf_token }}" />
             <button type="submit"
                     class="text-2xs text-ink-faint hover:text-red-600 uppercase tracking-[0.08em] font-semibold transition-colors">
               Delete

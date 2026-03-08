@@ -8,3 +8,7 @@ reports/*.md
 reports/*.html
 !reports/.gitkeep
 .sentinel/
+*.db
+firebase-debug.log
+.omx/
+external/

@@ -61,6 +61,10 @@ def create_app() -> FastAPI:
     reports_dir = os.environ.get("SENTINEL_REPORTS_DIR", "./reports")
     os.makedirs(reports_dir, exist_ok=True)
 
+    # 인증 미들웨어
+    from sentinel.auth import AuthMiddleware
+    app.add_middleware(AuthMiddleware)
+
     # 라우트 등록
     from sentinel.web.routes import router
     app.include_router(router)

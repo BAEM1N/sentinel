@@ -29,6 +29,7 @@
     Add Item from Trace
   </div>
   <form method="post" action="/datasets/{{ dataset_name }}/items" class="px-4 py-4 flex items-end gap-4">
+    <input type="hidden" name="_csrf_token" value="{{ request.state.csrf_token }}" />
     <div class="flex-1">
       <label class="block text-2xs text-ink-muted uppercase tracking-[0.06em] mb-1.5">Trace ID</label>
       <input type="text" name="trace_id" required placeholder="Paste a trace ID"

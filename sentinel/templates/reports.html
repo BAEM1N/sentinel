@@ -18,6 +18,7 @@
   </summary>
   <div class="px-5 pb-5 pt-3 border-t border-rule">
     <form action="/api/generate" method="post" class="flex flex-wrap gap-5 items-end">
+      <input type="hidden" name="_csrf_token" value="{{ request.state.csrf_token }}" />
       <div>
         <label class="block text-2xs text-ink-muted uppercase tracking-[0.06em] mb-1.5">Period</label>
         <select name="period" class="border border-rule rounded-none px-3 py-[7px] text-[13px] bg-white">

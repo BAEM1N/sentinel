@@ -21,6 +21,7 @@
     New Dataset
   </div>
   <form method="post" action="/datasets" class="px-4 py-4 flex items-end gap-4">
+    <input type="hidden" name="_csrf_token" value="{{ request.state.csrf_token }}" />
     <div class="flex-1">
       <label class="block text-2xs text-ink-muted uppercase tracking-[0.06em] mb-1.5">Name</label>
       <input type="text" name="name" required placeholder="e.g. golden-qa-v1"
