@@ -2,7 +2,8 @@
 
 import logging
 import os
-from datetime import datetime, timezone
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -487,6 +488,59 @@ async def api_job_status(job_id: str):
     return JSONResponse(job.to_dict())
 
 
+# ---------------------------------------------------------------------------
+# Approvals (HITL)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/approvals", response_class=HTMLResponse)
+async def page_approvals(request: Request):
+    """HITL 승인 관리 페이지."""
+    from sentinel.approval import approval_manager, ApprovalStatus
+
+    pending = approval_manager.get_pending()
+    all_items = approval_manager.list_all(limit=200)
+    approved_count = sum(1 for a in all_items if a["status"] == ApprovalStatus.APPROVED.value)
+    rejected_count = sum(1 for a in all_items if a["status"] == ApprovalStatus.REJECTED.value)
+    history = [a for a in all_items if a["status"] != ApprovalStatus.PENDING.value]
+
+    return request.app.state.templates.TemplateResponse("approvals.html", {
+        "request": request,
+        "pending": pending,
+        "history": history,
+        "approved_count": approved_count,
+        "rejected_count": rejected_count,
+        "active_page": "approvals",
+    })
+
+
+@router.post("/approvals/{approval_id}/approve")
+async def action_approve(approval_id: str, decided_by: str = Form(""), reason: str = Form("")):
+    """승인 처리 후 목록 페이지로 리다이렉트."""
+    from sentinel.approval import approval_manager
+
+    approval_manager.approve(approval_id, decided_by=decided_by, reason=reason)
+    return RedirectResponse(url="/approvals", status_code=303)
+
+
+@router.post("/approvals/{approval_id}/reject")
+async def action_reject(approval_id: str, decided_by: str = Form(""), reason: str = Form("")):
+    """거절 처리 후 목록 페이지로 리다이렉트."""
+    from sentinel.approval import approval_manager
+
+    approval_manager.reject(approval_id, decided_by=decided_by, reason=reason)
+    return RedirectResponse(url="/approvals", status_code=303)
+
+
+@router.get("/api/approvals/pending")
+async def api_approvals_pending():
+    """대기 중인 승인 요청 JSON API (에이전트 폴링용)."""
+    from sentinel.approval import approval_manager
+
+    pending = approval_manager.get_pending()
+    return JSONResponse({"pending": pending, "count": len(pending)})
+
+
 @router.get("/audit", response_class=HTMLResponse)
 async def page_audit(request: Request, limit: int = 50, run_id: str = ""):
     """감사 로그 페이지."""
@@ -497,6 +551,291 @@ async def page_audit(request: Request, limit: int = 50, run_id: str = ""):
         "logs": logs,
         "active_page": "audit",
     })
+
+
+# ---------------------------------------------------------------------------
+# Eval Dashboard
+# ---------------------------------------------------------------------------
+
+
+@router.get("/eval", response_class=HTMLResponse)
+async def page_eval(request: Request):
+    """Eval Dashboard — 스코어 데이터 집계 페이지."""
+    from sentinel.config import lf_client
+
+    score_groups: dict[str, list] = defaultdict(list)
+    api_error = ""
+    try:
+        res = lf_client.api.score_v_2.get(limit=200)
+        data = res.data if hasattr(res, "data") else res
+        for s in data:
+            name = getattr(s, "name", None) or "unknown"
+            score_groups[name].append({
+                "value": getattr(s, "value", None),
+                "trace_id": getattr(s, "trace_id", None),
+                "timestamp": str(getattr(s, "timestamp", ""))[:19],
+                "comment": getattr(s, "comment", None),
+            })
+    except Exception as e:
+        logger.exception("Langfuse score API 호출 실패")
+        api_error = f"Langfuse API 오류: {e}"
+
+    # 통계 계산
+    now = datetime.now(timezone.utc)
+    seven_days_ago = now - timedelta(days=7)
+
+    total_count = 0
+    all_values = []
+    score_cards = []
+
+    for name, scores in sorted(score_groups.items()):
+        values = [s["value"] for s in scores if s["value"] is not None]
+        total_count += len(scores)
+        all_values.extend(values)
+
+        avg_val = sum(values) / len(values) if values else 0
+        min_val = min(values) if values else 0
+        max_val = max(values) if values else 0
+
+        # 최근 7일 트렌드 (날짜별 평균)
+        trend: dict[str, list[float]] = defaultdict(list)
+        for s in scores:
+            if s["value"] is not None and s["timestamp"]:
+                try:
+                    ts = datetime.fromisoformat(s["timestamp"].replace("Z", "+00:00"))
+                    if ts.tzinfo is None:
+                        ts = ts.replace(tzinfo=timezone.utc)
+                    if ts >= seven_days_ago:
+                        day_key = ts.strftime("%m-%d")
+                        trend[day_key].append(s["value"])
+                except (ValueError, TypeError):
+                    pass
+
+        trend_data = []
+        for day_key in sorted(trend.keys()):
+            day_vals = trend[day_key]
+            trend_data.append({
+                "day": day_key,
+                "avg": sum(day_vals) / len(day_vals),
+                "count": len(day_vals),
+            })
+
+        score_cards.append({
+            "name": name,
+            "count": len(scores),
+            "avg": round(avg_val, 3),
+            "min": round(min_val, 3),
+            "max": round(max_val, 3),
+            "trend": trend_data,
+            "recent": scores[:10],
+        })
+
+    overall_avg = round(sum(all_values) / len(all_values), 3) if all_values else 0
+
+    return request.app.state.templates.TemplateResponse("eval.html", {
+        "request": request,
+        "score_cards": score_cards,
+        "total_count": total_count,
+        "overall_avg": overall_avg,
+        "type_count": len(score_groups),
+        "active_page": "eval",
+        "api_error": api_error,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Alert Center
+# ---------------------------------------------------------------------------
+
+
+@router.get("/alerts", response_class=HTMLResponse)
+async def page_alerts(request: Request):
+    """Alert Center 메인 페이지."""
+    from sentinel.alerts import alert_manager
+
+    rules = alert_manager.list_rules()
+    history = alert_manager.get_history(limit=50)
+    return request.app.state.templates.TemplateResponse("alerts.html", {
+        "request": request,
+        "rules": rules,
+        "history": history,
+        "active_page": "alerts",
+    })
+
+
+@router.post("/alerts/rules")
+async def create_alert_rule(
+    request: Request,
+    name: str = Form(...),
+    metric: str = Form(...),
+    operator: str = Form(...),
+    threshold: float = Form(...),
+    channel: str = Form("log"),
+):
+    """새 알림 규칙 생성."""
+    from sentinel.alerts import alert_manager
+
+    alert_manager.create_rule(
+        name=name,
+        metric=metric,
+        operator=operator,
+        threshold=threshold,
+        channel=channel,
+    )
+    return RedirectResponse(url="/alerts", status_code=303)
+
+
+@router.post("/alerts/rules/{rule_id}/toggle")
+async def toggle_alert_rule(rule_id: int):
+    """규칙 활성화/비활성화 토글."""
+    from sentinel.alerts import alert_manager
+
+    alert_manager.toggle_rule(rule_id)
+    return RedirectResponse(url="/alerts", status_code=303)
+
+
+@router.post("/alerts/rules/{rule_id}/delete")
+async def delete_alert_rule(rule_id: int):
+    """규칙 삭제."""
+    from sentinel.alerts import alert_manager
+
+    alert_manager.delete_rule(rule_id)
+    return RedirectResponse(url="/alerts", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Dataset Builder
+# ---------------------------------------------------------------------------
+
+
+@router.get("/datasets", response_class=HTMLResponse)
+async def page_datasets(request: Request):
+    """데이터셋 목록 페이지."""
+    from sentinel.config import lf_client
+
+    datasets = []
+    api_error = ""
+    try:
+        res = lf_client.api.datasets.list()
+        data = res.data if hasattr(res, "data") else res
+        for ds in data:
+            item_count = 0
+            try:
+                items_res = lf_client.api.dataset_items.list(dataset_name=ds.name)
+                items_data = items_res.data if hasattr(items_res, "data") else items_res
+                item_count = len(items_data)
+            except Exception:
+                pass
+            datasets.append({
+                "name": ds.name,
+                "description": getattr(ds, "description", None),
+                "item_count": item_count,
+                "created_at": str(getattr(ds, "created_at", ""))[:19],
+            })
+    except Exception as e:
+        logger.exception("Langfuse datasets list API 호출 실패")
+        api_error = f"Langfuse API 오류: {e}"
+
+    return request.app.state.templates.TemplateResponse("datasets.html", {
+        "request": request,
+        "datasets": datasets,
+        "active_page": "datasets",
+        "api_error": api_error,
+    })
+
+
+@router.post("/datasets")
+async def create_dataset(
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+):
+    """새 데이터셋 생성."""
+    from sentinel.config import lf_client
+
+    try:
+        lf_client.api.datasets.create(name=name, description=description)
+    except Exception:
+        logger.exception("데이터셋 생성 실패: %s", name)
+
+    return RedirectResponse(url="/datasets", status_code=303)
+
+
+@router.get("/datasets/{dataset_name}", response_class=HTMLResponse)
+async def page_dataset_detail(request: Request, dataset_name: str):
+    """데이터셋 상세 페이지."""
+    from sentinel.config import lf_client
+
+    dataset_name = unquote(dataset_name)
+
+    items = []
+    description = ""
+    api_error = ""
+    try:
+        # 데이터셋 메타 정보 조회
+        try:
+            ds_res = lf_client.api.datasets.get(dataset_name=dataset_name)
+            description = getattr(ds_res, "description", "") or ""
+        except Exception:
+            pass
+
+        # 아이템 목록 조회
+        res = lf_client.api.dataset_items.list(dataset_name=dataset_name)
+        data = res.data if hasattr(res, "data") else res
+        for item in data:
+            input_str = str(getattr(item, "input", "") or "")
+            output_str = str(getattr(item, "expected_output", "") or "")
+            items.append({
+                "id": item.id,
+                "input_truncated": input_str[:100] + ("…" if len(input_str) > 100 else ""),
+                "input_full": input_str,
+                "output_truncated": output_str[:100] + ("…" if len(output_str) > 100 else ""),
+                "output_full": output_str,
+                "source_trace_id": getattr(item, "source_trace_id", None),
+                "created_at": str(getattr(item, "created_at", ""))[:19],
+            })
+    except Exception as e:
+        logger.exception("Langfuse dataset items API 호출 실패: %s", dataset_name)
+        api_error = f"Langfuse API 오류: {e}"
+
+    return request.app.state.templates.TemplateResponse("dataset_detail.html", {
+        "request": request,
+        "dataset_name": dataset_name,
+        "description": description,
+        "items": items,
+        "active_page": "datasets",
+        "api_error": api_error,
+    })
+
+
+@router.post("/datasets/{dataset_name}/items")
+async def add_dataset_item(
+    request: Request,
+    dataset_name: str,
+    trace_id: str = Form(...),
+):
+    """트레이스에서 데이터셋 아이템 추가."""
+    from sentinel.config import lf_client
+
+    dataset_name = unquote(dataset_name)
+
+    try:
+        # 트레이스 조회하여 input/output 가져오기
+        t = lf_client.api.trace.get(trace_id)
+        trace_input = getattr(t, "input", None)
+        trace_output = getattr(t, "output", None)
+
+        # 데이터셋 아이템 생성
+        lf_client.api.dataset_items.create(
+            dataset_name=dataset_name,
+            input=trace_input,
+            expected_output=trace_output,
+            source_trace_id=trace_id,
+        )
+    except Exception:
+        logger.exception("데이터셋 아이템 추가 실패: %s / trace %s", dataset_name, trace_id)
+
+    return RedirectResponse(url=f"/datasets/{dataset_name}", status_code=303)
 
 
 @router.get("/scheduler", response_class=HTMLResponse)
