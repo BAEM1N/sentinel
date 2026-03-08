@@ -153,23 +153,58 @@ def _create_model(provider: str | None = None, model: str | None = None):
 
 
 # ---------------------------------------------------------------------------
-# 모듈 레벨 인스턴스
+# Lazy 초기화 — import 시 외부 서비스 연결하지 않음
 # ---------------------------------------------------------------------------
 
-model = _create_model()
+_model = None
+_lf_client = None
+_langfuse_handler = None
+_lf_config = None
+_lf_config_initialized = False
 
-# --- Langfuse 클라이언트 ---
-from langfuse import Langfuse  # noqa: E402
 
-lf_client = Langfuse()
+def get_model():
+    """LangChain ChatModel 인스턴스 (lazy singleton)."""
+    global _model
+    if _model is None:
+        _model = _create_model()
+    return _model
 
-# --- 콜백 (observability) ---
-langfuse_handler = None
-if os.environ.get("LANGFUSE_SECRET_KEY"):
-    try:
-        from langfuse.langchain import CallbackHandler  # noqa: E402
-        langfuse_handler = CallbackHandler()
-    except (ImportError, ModuleNotFoundError):
-        pass
 
-lf_config: dict = {"callbacks": [langfuse_handler]} if langfuse_handler else {}
+def get_lf_client():
+    """Langfuse 클라이언트 (lazy singleton)."""
+    global _lf_client
+    if _lf_client is None:
+        from langfuse import Langfuse
+        _lf_client = Langfuse()
+    return _lf_client
+
+
+def get_lf_config() -> dict:
+    """LangChain 콜백 설정 dict (lazy singleton)."""
+    global _lf_config, _lf_config_initialized, _langfuse_handler
+    if not _lf_config_initialized:
+        _langfuse_handler = None
+        if os.environ.get("LANGFUSE_SECRET_KEY"):
+            try:
+                from langfuse.langchain import CallbackHandler
+                _langfuse_handler = CallbackHandler()
+            except (ImportError, ModuleNotFoundError):
+                pass
+        _lf_config = {"callbacks": [_langfuse_handler]} if _langfuse_handler else {}
+        _lf_config_initialized = True
+    return _lf_config
+
+
+# 하위 호환: from sentinel.config import model, lf_client, lf_config
+def __getattr__(name: str):
+    if name == "model":
+        return get_model()
+    if name == "lf_client":
+        return get_lf_client()
+    if name == "lf_config":
+        return get_lf_config()
+    if name == "langfuse_handler":
+        get_lf_config()  # ensure initialized
+        return _langfuse_handler
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

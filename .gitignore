@@ -4,11 +4,18 @@ __pycache__/
 .venv/
 *.egg-info/
 dist/
+
+# Runtime artifacts (gitignored)
+runtime/
+.sentinel/
+*.db
 reports/*.md
 reports/*.html
 !reports/.gitkeep
-.sentinel/
-*.db
-firebase-debug.log
-.omx/
+
+# External / vendor
 external/
+
+# IDE & tools
+.omx/
+firebase-debug.log

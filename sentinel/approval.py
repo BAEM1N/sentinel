@@ -216,10 +216,8 @@ class ApprovalManager:
                 if row_dict.get("params_json"):
                     try:
                         p = json.loads(row_dict["params_json"])
-                        if param_value in (
-                            os.path.basename(p.get("md_path", "")),
-                            os.path.basename(p.get("html_path", "")) if p.get("html_path") else "",
-                        ):
+                        stored = p.get(param_key, "")
+                        if stored and os.path.basename(stored) == param_value:
                             return row_dict
                     except (json.JSONDecodeError, TypeError):
                         pass

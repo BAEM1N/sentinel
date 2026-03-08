@@ -36,7 +36,9 @@ class SessionManager:
     def _ensure_initialized(self):
         if self._initialized:
             return
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        dir_name = os.path.dirname(self.db_path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
         self._init_db()
         self._initialized = True
 
@@ -121,14 +123,28 @@ class SessionManager:
 
 
 def verify_credentials(username: str, password: str) -> bool:
-    """환경변수의 admin 계정과 비교."""
-    admin_user = os.environ.get("SENTINEL_ADMIN_USER", "admin")
-    admin_pass = os.environ.get("SENTINEL_ADMIN_PASS", "admin")
-    if admin_user == "admin" and admin_pass == "admin":
-        logger.warning(
-            "기본 관리자 계정(admin/admin) 사용 중 — "
-            "SENTINEL_ADMIN_USER/SENTINEL_ADMIN_PASS 환경변수를 설정하세요."
-        )
+    """환경변수의 admin 계정과 비교.
+
+    기본 admin/admin 계정은 개발 모드에서만 허용됩니다.
+    프로덕션에서는 SENTINEL_ADMIN_USER/SENTINEL_ADMIN_PASS를 반드시 설정하세요.
+    """
+    admin_user = os.environ.get("SENTINEL_ADMIN_USER", "")
+    admin_pass = os.environ.get("SENTINEL_ADMIN_PASS", "")
+
+    # 환경변수 미설정 시 개발용 기본 계정 (DEV 모드에서만)
+    if not admin_user or not admin_pass:
+        dev_mode = os.environ.get("SENTINEL_ENV", "development").lower() != "production"
+        if dev_mode:
+            admin_user = admin_user or "admin"
+            admin_pass = admin_pass or "admin"
+            logger.warning(
+                "기본 관리자 계정(admin/admin) 사용 중 — "
+                "SENTINEL_ADMIN_USER/SENTINEL_ADMIN_PASS 환경변수를 설정하세요."
+            )
+        else:
+            logger.error("프로덕션 환경에서 관리자 계정이 설정되지 않았습니다.")
+            return False
+
     return secrets.compare_digest(username, admin_user) and secrets.compare_digest(
         password, admin_pass
     )
