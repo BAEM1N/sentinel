@@ -2,6 +2,7 @@
 
 import logging
 import os
+import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -72,6 +73,9 @@ async def page_reports(request: Request):
 @router.get("/reports/{filename}", response_class=HTMLResponse)
 async def page_report_view(request: Request, filename: str):
     """보고서 상세 보기."""
+    import json
+    from sentinel.approval import approval_manager
+
     reports_base = Path(REPORTS_DIR).resolve()
     filepath = (reports_base / filename).resolve()
     # 경로 탐색 방어 — reports 디렉토리 밖 접근 차단
@@ -83,13 +87,59 @@ async def page_report_view(request: Request, filename: str):
     content = filepath.read_text(encoding="utf-8")
     is_html = filepath.suffix == ".html"
 
+    # 이 보고서에 대한 승인 상태 확인
+    approval_status = None
+    all_approvals = approval_manager.list_all(limit=500)
+    for item in all_approvals:
+        if item.get("request_type") != "report_publish":
+            continue
+        params = json.loads(item["params_json"]) if item.get("params_json") else {}
+        md_basename = os.path.basename(params.get("md_path", ""))
+        html_basename = os.path.basename(params.get("html_path", "")) if params.get("html_path") else ""
+        if md_basename == filename or html_basename == filename:
+            approval_status = item["status"]
+            break
+
     return request.app.state.templates.TemplateResponse("report_view.html", {
         "request": request,
         "filename": filename,
         "content": content,
         "is_html": is_html,
         "active_page": "reports",
+        "approval_status": approval_status,
     })
+
+
+@router.post("/reports/{filename}/publish")
+async def action_publish_report(request: Request, filename: str):
+    """승인된 보고서를 발행(알림 전송)합니다."""
+    import json
+    from sentinel.approval import approval_manager, ApprovalStatus
+
+    # 해당 보고서에 대한 승인 요청 검색
+    all_items = approval_manager.list_all(limit=500, status_filter=ApprovalStatus.APPROVED.value)
+    matched = None
+    for item in all_items:
+        if item.get("request_type") != "report_publish":
+            continue
+        params = json.loads(item["params_json"]) if item.get("params_json") else {}
+        md_basename = os.path.basename(params.get("md_path", ""))
+        html_basename = os.path.basename(params.get("html_path", "")) if params.get("html_path") else ""
+        if md_basename == filename or html_basename == filename:
+            matched = params
+            break
+
+    if not matched:
+        return HTMLResponse("<h1>승인되지 않은 보고서입니다.</h1>", status_code=403)
+
+    # 승인 확인 → 알림 전송
+    from sentinel.web.notify import send_report
+
+    md_path = matched.get("md_path", "")
+    html_path = matched.get("html_path")
+    send_report(md_path, html_path)
+
+    return RedirectResponse(url=f"/reports/{filename}", status_code=303)
 
 
 @router.get("/reports/{filename}/raw")
@@ -387,6 +437,7 @@ async def api_generate(
     from_date: str = Form(""),
     to_date: str = Form(""),
     output_html: bool = Form(False),
+    require_approval: bool = Form(False),
 ):
     """보고서 생성 API — 백그라운드 Job으로 실행."""
     # --- 입력 검증 ---
@@ -415,16 +466,17 @@ async def api_generate(
     from sentinel.services.job_manager import job_manager
     from sentinel.services.report_service import ReportService
 
-    def _run_report(period, from_ts, to_ts, output_html):
+    def _run_report(period, from_ts, to_ts, output_html, require_approval):
         svc = ReportService()
         result = svc.generate(
             period=period,
             from_ts=from_ts,
             to_ts=to_ts,
             output_html=output_html,
-            notify=True,
+            notify=not require_approval,
+            require_approval=require_approval,
         )
-        return {"md_path": result.md_path, "html_path": result.html_path}
+        return {"md_path": result.md_path, "html_path": result.html_path, "approval_id": result.approval_id}
 
     job = job_manager.submit(
         "report_generate",
@@ -434,6 +486,7 @@ async def api_generate(
             "from_ts": from_ts,
             "to_ts": to_ts,
             "output_html": output_html,
+            "require_approval": require_approval,
         },
     )
 
@@ -644,6 +697,72 @@ async def page_eval(request: Request):
 
 
 # ---------------------------------------------------------------------------
+# Review Inbox
+# ---------------------------------------------------------------------------
+
+
+@router.get("/reviews", response_class=HTMLResponse)
+async def page_reviews(request: Request, threshold: float = Query(0.5, ge=0.0, le=1.0)):
+    """Review Inbox — 낮은 점수 스코어 검토 큐."""
+    from sentinel.config import lf_client
+
+    scores = []
+    api_error = ""
+    try:
+        res = lf_client.api.score_v_2.get(limit=100)
+        data = res.data if hasattr(res, "data") else res
+        for s in data:
+            value = getattr(s, "value", None)
+            if value is not None and value <= threshold:
+                scores.append({
+                    "score_id": getattr(s, "id", None),
+                    "trace_id": getattr(s, "trace_id", None),
+                    "name": getattr(s, "name", None) or "unknown",
+                    "value": value,
+                    "comment": getattr(s, "comment", None),
+                    "timestamp": str(getattr(s, "timestamp", ""))[:19],
+                })
+        # 낮은 점수 순 정렬 (검토 필요한 것 먼저)
+        scores.sort(key=lambda x: x["value"])
+    except Exception as e:
+        logger.exception("Langfuse score API 호출 실패 (Review Inbox)")
+        api_error = f"Langfuse API 오류: {e}"
+
+    # KPI 계산
+    review_count = len(scores)
+    values = [s["value"] for s in scores]
+    avg_score = round(sum(values) / len(values), 3) if values else 0
+
+    return request.app.state.templates.TemplateResponse("reviews.html", {
+        "request": request,
+        "scores": scores,
+        "review_count": review_count,
+        "avg_score": avg_score,
+        "threshold": threshold,
+        "active_page": "reviews",
+        "api_error": api_error,
+    })
+
+
+@router.post("/reviews/{trace_id}/acknowledge")
+async def action_acknowledge_review(request: Request, trace_id: str):
+    """검토 완료 처리 — 해당 trace에 'reviewed' 스코어 추가."""
+    from sentinel.config import lf_client
+
+    try:
+        lf_client.score(
+            trace_id=trace_id,
+            name="reviewed",
+            value=1.0,
+            comment="reviewed via inbox",
+        )
+    except Exception:
+        logger.exception("Review acknowledge 실패: %s", trace_id)
+
+    return RedirectResponse(url="/reviews", status_code=303)
+
+
+# ---------------------------------------------------------------------------
 # Alert Center
 # ---------------------------------------------------------------------------
 
@@ -838,6 +957,83 @@ async def add_dataset_item(
     return RedirectResponse(url=f"/datasets/{dataset_name}", status_code=303)
 
 
+# ---------------------------------------------------------------------------
+# Playbooks
+# ---------------------------------------------------------------------------
+
+
+@router.get("/playbooks", response_class=HTMLResponse)
+async def page_playbooks(request: Request):
+    """Playbook 목록 페이지."""
+    from sentinel.playbook import playbook_manager
+
+    playbooks = playbook_manager.list_all()
+    return request.app.state.templates.TemplateResponse("playbooks.html", {
+        "request": request,
+        "playbooks": playbooks,
+        "active_page": "playbooks",
+    })
+
+
+@router.get("/playbooks/{playbook_id}", response_class=HTMLResponse)
+async def page_playbook_detail(request: Request, playbook_id: int):
+    """Playbook 상세 페이지."""
+    from sentinel.playbook import playbook_manager
+
+    playbook = playbook_manager.get(playbook_id)
+    if not playbook:
+        return HTMLResponse("<h1>Playbook not found</h1>", status_code=404)
+
+    runs = playbook_manager.get_runs(playbook_id, limit=20)
+    return request.app.state.templates.TemplateResponse("playbook_detail.html", {
+        "request": request,
+        "playbook": playbook,
+        "runs": runs,
+        "active_page": "playbooks",
+    })
+
+
+@router.post("/playbooks")
+async def create_playbook(
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    steps_json: str = Form("[]"),
+):
+    """새 Playbook 생성."""
+    import json
+    from sentinel.playbook import playbook_manager
+
+    try:
+        steps = json.loads(steps_json)
+    except (json.JSONDecodeError, TypeError):
+        return HTMLResponse("Invalid JSON in steps", status_code=400)
+
+    playbook_manager.create(name=name, description=description, steps=steps)
+    return RedirectResponse(url="/playbooks", status_code=303)
+
+
+@router.post("/playbooks/{playbook_id}/run")
+async def run_playbook(request: Request, playbook_id: int):
+    """Playbook 실행 (백그라운드 Job)."""
+    from sentinel.playbook import playbook_manager
+
+    job_id = playbook_manager.start_run(playbook_id)
+    if not job_id:
+        return HTMLResponse("<h1>Playbook not found</h1>", status_code=404)
+
+    return RedirectResponse(url=f"/jobs/{job_id}", status_code=303)
+
+
+@router.post("/playbooks/{playbook_id}/delete")
+async def delete_playbook(playbook_id: int):
+    """Playbook 삭제."""
+    from sentinel.playbook import playbook_manager
+
+    playbook_manager.delete(playbook_id)
+    return RedirectResponse(url="/playbooks", status_code=303)
+
+
 @router.get("/scheduler", response_class=HTMLResponse)
 async def page_scheduler(request: Request):
     """스케줄러 페이지."""
@@ -880,6 +1076,103 @@ async def scheduler_status(request: Request):
             "trigger": str(job.trigger),
         })
     return {"running": scheduler.running, "jobs": jobs}
+
+
+# ---------------------------------------------------------------------------
+# Settings
+# ---------------------------------------------------------------------------
+
+
+def _mask_secret(value: str) -> str:
+    """API 키 등 민감 정보를 마스킹합니다. 앞 4자만 표시."""
+    if not value or len(value) <= 4:
+        return "****"
+    return value[:4] + "***"
+
+
+@router.get("/settings", response_class=HTMLResponse)
+async def page_settings(request: Request):
+    """프로젝트 설정 페이지."""
+    from sentinel.config import lf_client
+
+    # --- 환경 변수 수집 ---
+    _SECRET_KEYS = {"LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "SENTINEL_API_KEY"}
+    env_vars = [
+        ("SENTINEL_PROVIDER", os.environ.get("SENTINEL_PROVIDER", ""), "openai"),
+        ("SENTINEL_MODEL", os.environ.get("SENTINEL_MODEL", ""), "gpt-5.4"),
+        ("SENTINEL_FALLBACK_MODEL", os.environ.get("SENTINEL_FALLBACK_MODEL", ""), "gpt-4.1-mini"),
+        ("LANGFUSE_HOST", os.environ.get("LANGFUSE_HOST", ""), "https://cloud.langfuse.com"),
+        ("LANGFUSE_PUBLIC_KEY", os.environ.get("LANGFUSE_PUBLIC_KEY", ""), ""),
+        ("SENTINEL_REPORTS_DIR", os.environ.get("SENTINEL_REPORTS_DIR", ""), "./reports"),
+        ("SENTINEL_CHECKPOINT_DIR", os.environ.get("SENTINEL_CHECKPOINT_DIR", ""), "./checkpoints"),
+        ("SENTINEL_ENABLE_SCHEDULER", os.environ.get("SENTINEL_ENABLE_SCHEDULER", ""), "false"),
+        ("SENTINEL_AUTO_HTML", os.environ.get("SENTINEL_AUTO_HTML", ""), "false"),
+        ("SENTINEL_TIMEZONE", os.environ.get("SENTINEL_TIMEZONE", ""), "UTC"),
+    ]
+
+    config_rows = []
+    for key, raw_value, default_value in env_vars:
+        if raw_value:
+            display = _mask_secret(raw_value) if key in _SECRET_KEYS else raw_value
+            source = "env"
+        else:
+            display = default_value if default_value else "(not set)"
+            source = "default"
+        config_rows.append({"key": key, "value": display, "source": source})
+
+    # --- Langfuse 연결 상태 ---
+    langfuse_status = "OK"
+    langfuse_error = ""
+    try:
+        lf_client.api.trace.list(limit=1)
+    except Exception as e:
+        langfuse_status = "Error"
+        langfuse_error = str(e)
+
+    langfuse_host = os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com")
+
+    # --- Storage 상태 ---
+    reports_dir = Path(os.environ.get("SENTINEL_REPORTS_DIR", "./reports"))
+    storage_ok = reports_dir.exists()
+    report_file_count = 0
+    if storage_ok:
+        report_file_count = sum(
+            1 for f in reports_dir.iterdir() if f.suffix in (".md", ".html")
+        )
+
+    # --- Scheduler 상태 ---
+    scheduler = getattr(request.app.state, "scheduler", None)
+    if scheduler is None:
+        scheduler_status = "Disabled"
+    elif scheduler.running:
+        scheduler_status = "Running"
+    else:
+        scheduler_status = "Stopped"
+
+    # --- 시스템 정보 ---
+    python_version = sys.version.split()[0]
+    pkg_versions = {}
+    for pkg_name in ("sentinel", "langfuse", "langchain-core", "fastapi", "uvicorn"):
+        try:
+            from importlib.metadata import version as _pkg_version
+            pkg_versions[pkg_name] = _pkg_version(pkg_name)
+        except Exception:
+            pkg_versions[pkg_name] = "—"
+
+    return request.app.state.templates.TemplateResponse("settings.html", {
+        "request": request,
+        "active_page": "settings",
+        "config_rows": config_rows,
+        "langfuse_status": langfuse_status,
+        "langfuse_error": langfuse_error,
+        "langfuse_host": langfuse_host,
+        "storage_ok": storage_ok,
+        "report_file_count": report_file_count,
+        "reports_dir": str(reports_dir),
+        "scheduler_status": scheduler_status,
+        "python_version": python_version,
+        "pkg_versions": pkg_versions,
+    })
 
 
 # ---------------------------------------------------------------------------

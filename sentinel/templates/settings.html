@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Sentinel — Settings{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex items-baseline justify-between mb-8">
+  <h1 class="text-[22px] font-bold tracking-[-0.03em]">Project Settings</h1>
+  <span class="text-xs text-ink-muted">Read-only configuration view</span>
+</div>
+
+<!-- Connection Status Cards -->
+<div class="text-2xs text-ink-muted uppercase tracking-[0.1em] mb-3 font-semibold">Connection Status</div>
+<div class="grid grid-cols-3 border border-rule mb-10">
+  <!-- Langfuse -->
+  <div class="p-5 border-r border-rule">
+    <div class="flex items-center gap-2 mb-2">
+      <span class="inline-block w-2 h-2 rounded-full {% if langfuse_status == 'OK' %}bg-green-500{% else %}bg-red-500{% endif %}"></span>
+      <span class="text-[13px] font-semibold">Langfuse</span>
+    </div>
+    <div class="text-[13px] {% if langfuse_status == 'OK' %}text-ink-light{% else %}text-red-600{% endif %}">{{ langfuse_status }}</div>
+    <div class="text-2xs text-ink-faint mt-1 truncate" title="{{ langfuse_host }}">{{ langfuse_host }}</div>
+    {% if langfuse_error %}
+    <div class="text-2xs text-red-500 mt-1 truncate" title="{{ langfuse_error }}">{{ langfuse_error }}</div>
+    {% endif %}
+  </div>
+
+  <!-- Storage -->
+  <div class="p-5 border-r border-rule">
+    <div class="flex items-center gap-2 mb-2">
+      <span class="inline-block w-2 h-2 rounded-full {% if storage_ok %}bg-green-500{% else %}bg-red-500{% endif %}"></span>
+      <span class="text-[13px] font-semibold">Storage</span>
+    </div>
+    <div class="text-[13px] text-ink-light">{% if storage_ok %}Available{% else %}Not Found{% endif %}</div>
+    <div class="text-2xs text-ink-faint mt-1">{{ reports_dir }} &middot; {{ report_file_count }} files</div>
+  </div>
+
+  <!-- Scheduler -->
+  <div class="p-5">
+    <div class="flex items-center gap-2 mb-2">
+      <span class="inline-block w-2 h-2 rounded-full {% if scheduler_status == 'Running' %}bg-green-500{% elif scheduler_status == 'Stopped' %}bg-yellow-500{% else %}bg-ink-faint{% endif %}"></span>
+      <span class="text-[13px] font-semibold">Scheduler</span>
+    </div>
+    <div class="text-[13px] text-ink-light">{{ scheduler_status }}</div>
+    <div class="text-2xs text-ink-faint mt-1">
+      {% if scheduler_status == 'Disabled' %}SENTINEL_ENABLE_SCHEDULER = false{% elif scheduler_status == 'Running' %}APScheduler active{% else %}APScheduler stopped{% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Environment Variables -->
+<div class="text-2xs text-ink-muted uppercase tracking-[0.1em] mb-3 font-semibold">Environment Variables</div>
+<div class="border border-rule mb-10">
+  <table class="w-full text-[13px]">
+    <thead>
+      <tr class="border-b border-rule text-2xs text-ink-muted uppercase tracking-[0.06em]">
+        <th class="text-left px-4 py-2.5 font-semibold">Key</th>
+        <th class="text-left px-4 py-2.5 font-semibold">Value</th>
+        <th class="text-left px-4 py-2.5 font-semibold w-24">Source</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in config_rows %}
+      <tr class="border-b border-rule last:border-b-0 hover:bg-ink-wash transition-colors row-animate" style="animation-delay: {{ loop.index0 * 30 }}ms">
+        <td class="px-4 py-2.5 font-mono text-[12px]">{{ row.key }}</td>
+        <td class="px-4 py-2.5 font-mono text-[12px] text-ink-light">{{ row.value }}</td>
+        <td class="px-4 py-2.5">
+          {% if row.source == 'env' %}
+          <span class="inline-block text-2xs px-1.5 py-0.5 border border-rule text-ink-muted">env</span>
+          {% else %}
+          <span class="inline-block text-2xs px-1.5 py-0.5 text-ink-faint">(default)</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- System Information -->
+<div class="text-2xs text-ink-muted uppercase tracking-[0.1em] mb-3 font-semibold">System Information</div>
+<div class="border border-rule">
+  <table class="w-full text-[13px]">
+    <tbody>
+      <tr class="border-b border-rule">
+        <td class="px-4 py-2.5 font-mono text-[12px] w-48">Python</td>
+        <td class="px-4 py-2.5 font-mono text-[12px] text-ink-light">{{ python_version }}</td>
+      </tr>
+      {% for pkg, ver in pkg_versions.items() %}
+      <tr class="{% if not loop.last %}border-b border-rule{% endif %}">
+        <td class="px-4 py-2.5 font-mono text-[12px]">{{ pkg }}</td>
+        <td class="px-4 py-2.5 font-mono text-[12px] text-ink-light">{{ ver }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

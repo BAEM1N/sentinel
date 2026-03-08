@@ -24,6 +24,7 @@ class ReportResult:
     to_ts: str
     run_id: str
     notify_results: dict | None = None
+    approval_id: str | None = None
 
 
 class ReportService:
@@ -65,6 +66,7 @@ class ReportService:
         to_ts: str = "",
         output_html: bool = False,
         notify: bool = False,
+        require_approval: bool = False,
     ) -> ReportResult:
         """보고서 생성 + 저장 + (옵션) 알림.
 
@@ -74,6 +76,7 @@ class ReportService:
             to_ts: 종료 날짜 (ISO8601, 비우면 현재)
             output_html: True이면 HTML 보고서도 추가 생성
             notify: True이면 알림 채널로 전송
+            require_approval: True이면 발행 전 승인 요청 (알림은 보내지 않음)
 
         Returns:
             ReportResult 인스턴스
@@ -148,9 +151,23 @@ class ReportService:
             with open(html_path, "w", encoding="utf-8") as f:
                 f.write(full_html)
 
-        # 6. 알림 전송 (옵션) ---------------------------------------------------
+        # 6. 승인 요청 또는 알림 전송 -------------------------------------------
         notify_results: dict | None = None
-        if notify:
+        approval_id: str | None = None
+
+        if require_approval:
+            from sentinel.approval import approval_manager
+
+            approval_id = approval_manager.request_approval(
+                request_type="report_publish",
+                action_summary=f"보고서 발행 승인 요청: {os.path.basename(md_path)}",
+                params={
+                    "md_path": md_path,
+                    "html_path": html_path,
+                    "period": period,
+                },
+            )
+        elif notify:
             from sentinel.web.notify import send_report
 
             notify_results = send_report(md_path, html_path)
@@ -163,4 +180,5 @@ class ReportService:
             to_ts=to_ts,
             run_id=run_id,
             notify_results=notify_results,
+            approval_id=approval_id,
         )
