@@ -3,7 +3,7 @@ import json
 import logging
 import os
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from contextlib import contextmanager
 
 logger = logging.getLogger("sentinel.audit")
@@ -17,8 +17,15 @@ class AuditLog:
             os.environ.get("SENTINEL_CHECKPOINT_DIR", ".sentinel/checkpoints"),
             "audit.db",
         )
+        self._initialized = False
+
+    def _ensure_initialized(self):
+        """DB 초기화를 첫 사용 시까지 지연합니다."""
+        if self._initialized:
+            return
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self._init_db()
+        self._initialized = True
 
     def _init_db(self):
         with self._conn() as conn:
@@ -57,7 +64,7 @@ class AuditLog:
         finally:
             conn.close()
 
-    def log(
+    def log(  # noqa: PLR0913
         self,
         action,
         tool_name=None,
@@ -73,6 +80,7 @@ class AuditLog:
         metadata=None,
     ):
         """감사 로그 기록."""
+        self._ensure_initialized()
         with self._conn() as conn:
             conn.execute(
                 """INSERT INTO audit_log
@@ -80,7 +88,7 @@ class AuditLog:
                     output_summary, is_mutation, before_state, after_state, status, error, metadata)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    datetime.utcnow().isoformat() + "Z",
+                    datetime.now(timezone.utc).isoformat(),
                     run_id,
                     thread_id,
                     action,
@@ -107,6 +115,7 @@ class AuditLog:
         to_ts=None,
     ):
         """감사 로그 조회."""
+        self._ensure_initialized()
         sql = "SELECT * FROM audit_log WHERE 1=1"
         params = []
         if run_id:
@@ -135,6 +144,7 @@ class AuditLog:
 
     def get_run_summary(self, run_id):
         """특정 run의 요약 정보."""
+        self._ensure_initialized()
         with self._conn() as conn:
             row = conn.execute(
                 """SELECT

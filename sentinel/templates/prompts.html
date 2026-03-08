@@ -8,6 +8,13 @@
   <span class="text-xs text-ink-muted font-mono">{{ prompts|length }} prompts</span>
 </div>
 
+<!-- API Error -->
+{% if api_error %}
+<div class="border border-red-200 bg-red-50 px-5 py-3 mb-6 text-[13px] text-red-700">
+  {{ api_error }}
+</div>
+{% endif %}
+
 <!-- Table -->
 {% if prompts %}
 <div class="border border-rule overflow-hidden">

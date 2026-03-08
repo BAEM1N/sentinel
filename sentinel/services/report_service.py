@@ -8,7 +8,7 @@ import logging
 import os
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger("sentinel.services.report")
 
@@ -87,7 +87,7 @@ class ReportService:
         )
 
         # 1. 날짜 기본값 계산 -------------------------------------------------
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         if not to_ts:
             to_ts = now.strftime("%Y-%m-%dT%H:%M:%SZ")
         if not from_ts:

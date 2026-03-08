@@ -1,8 +1,9 @@
 """스케줄러 — 일간/주간/월간 보고서 자동 생성."""
 
+import asyncio
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -34,34 +35,34 @@ def _generate_scheduled_report(period: str, from_ts: str, to_ts: str):
         logger.error("[scheduler] %s 보고서 생성 실패: %s", period, e)
 
 
-def _job_daily():
+async def _job_daily():
     """매일 00:00 — 전일 보고서."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     yesterday = now - timedelta(days=1)
     from_ts = yesterday.strftime("%Y-%m-%dT00:00:00Z")
     to_ts = yesterday.strftime("%Y-%m-%dT23:59:59Z")
-    _generate_scheduled_report("daily", from_ts, to_ts)
+    await asyncio.to_thread(_generate_scheduled_report, "daily", from_ts, to_ts)
 
 
-def _job_weekly():
+async def _job_weekly():
     """매주 월요일 00:00 — 지난주 월~일 보고서."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     last_monday = now - timedelta(days=now.weekday() + 7)
     last_sunday = last_monday + timedelta(days=6)
     from_ts = last_monday.strftime("%Y-%m-%dT00:00:00Z")
     to_ts = last_sunday.strftime("%Y-%m-%dT23:59:59Z")
-    _generate_scheduled_report("weekly", from_ts, to_ts)
+    await asyncio.to_thread(_generate_scheduled_report, "weekly", from_ts, to_ts)
 
 
-def _job_monthly():
+async def _job_monthly():
     """매월 1일 00:00 — 지난달 보고서."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     first_of_this_month = now.replace(day=1)
     last_day_prev = first_of_this_month - timedelta(days=1)
     first_of_prev = last_day_prev.replace(day=1)
     from_ts = first_of_prev.strftime("%Y-%m-%dT00:00:00Z")
     to_ts = last_day_prev.strftime("%Y-%m-%dT23:59:59Z")
-    _generate_scheduled_report("monthly", from_ts, to_ts)
+    await asyncio.to_thread(_generate_scheduled_report, "monthly", from_ts, to_ts)
 
 
 def create_scheduler() -> AsyncIOScheduler:

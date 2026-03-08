@@ -2,8 +2,9 @@
 
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import unquote
 
 from fastapi import APIRouter, Request, Form, Query
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, RedirectResponse
@@ -70,9 +71,10 @@ async def page_reports(request: Request):
 @router.get("/reports/{filename}", response_class=HTMLResponse)
 async def page_report_view(request: Request, filename: str):
     """보고서 상세 보기."""
-    filepath = (Path(REPORTS_DIR) / filename).resolve()
+    reports_base = Path(REPORTS_DIR).resolve()
+    filepath = (reports_base / filename).resolve()
     # 경로 탐색 방어 — reports 디렉토리 밖 접근 차단
-    if not str(filepath).startswith(str(Path(REPORTS_DIR).resolve())):
+    if not filepath.is_relative_to(reports_base):
         return HTMLResponse("<h1>Forbidden</h1>", status_code=403)
     if not filepath.exists():
         return HTMLResponse("<h1>Not Found</h1>", status_code=404)
@@ -92,8 +94,9 @@ async def page_report_view(request: Request, filename: str):
 @router.get("/reports/{filename}/raw")
 async def download_report(filename: str):
     """보고서 파일 다운로드."""
-    filepath = (Path(REPORTS_DIR) / filename).resolve()
-    if not str(filepath).startswith(str(Path(REPORTS_DIR).resolve())):
+    reports_base = Path(REPORTS_DIR).resolve()
+    filepath = (reports_base / filename).resolve()
+    if not filepath.is_relative_to(reports_base):
         return HTMLResponse("Forbidden", status_code=403)
     if not filepath.exists():
         return HTMLResponse("Not Found", status_code=404)
@@ -141,6 +144,7 @@ async def page_traces(
     traces = []
     total = 0
     has_next = False
+    api_error = ""
     try:
         res = lf_client.api.trace.list(**kwargs)
         data = res.data if hasattr(res, "data") else res
@@ -164,8 +168,9 @@ async def page_traces(
                 "level": getattr(t, "level", None),
             })
         has_next = len(data) >= TRACES_PER_PAGE
-    except Exception:
+    except Exception as e:
         logger.exception("Langfuse trace list API 호출 실패")
+        api_error = f"Langfuse API 오류: {e}"
 
     filters = {
         "name": name,
@@ -184,6 +189,7 @@ async def page_traces(
         "has_next": has_next,
         "filters": filters,
         "active_page": "traces",
+        "api_error": api_error,
     })
 
 
@@ -268,6 +274,7 @@ async def page_prompts(request: Request):
     from sentinel.config import lf_client
 
     prompts = []
+    api_error = ""
     try:
         res = lf_client.api.prompts.list(limit=50)
         data = res.data if hasattr(res, "data") else res
@@ -279,13 +286,15 @@ async def page_prompts(request: Request):
                 "type": getattr(p, "type", "text"),
                 "last_updated": str(getattr(p, "last_updated_at", ""))[:19],
             })
-    except Exception:
+    except Exception as e:
         logger.exception("Langfuse prompts list API 호출 실패")
+        api_error = f"Langfuse API 오류: {e}"
 
     return request.app.state.templates.TemplateResponse("prompts.html", {
         "request": request,
         "prompts": prompts,
         "active_page": "prompts",
+        "api_error": api_error,
     })
 
 
@@ -293,6 +302,8 @@ async def page_prompts(request: Request):
 async def page_prompt_detail(request: Request, prompt_name: str, version: int = 0):
     """프롬프트 상세 페이지."""
     from sentinel.config import lf_client
+
+    prompt_name = unquote(prompt_name)
 
     prompt_data = {}
     versions = []
@@ -341,6 +352,7 @@ async def page_prompt_compare(request: Request, prompt_name: str, v1: int = 0, v
     """프롬프트 버전 비교."""
     from sentinel.config import lf_client
 
+    prompt_name = unquote(prompt_name)
     left = right = None
     try:
         if v1 > 0:
@@ -538,7 +550,7 @@ async def scheduler_status(request: Request):
 @router.get("/health")
 async def health():
     """프로세스 헬스 체크."""
-    return {"status": "ok", "timestamp": datetime.utcnow().isoformat() + "Z"}
+    return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @router.get("/ready")

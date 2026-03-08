@@ -6,7 +6,7 @@ import logging
 import threading
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -34,7 +34,7 @@ class Job:
 
     def __post_init__(self):
         if not self.created_at:
-            self.created_at = datetime.utcnow().isoformat() + "Z"
+            self.created_at = datetime.now(timezone.utc).isoformat()
 
     def to_dict(self):
         return {
@@ -77,19 +77,23 @@ class JobManager:
 
     def _run_job(self, job: Job, func):
         """Job 실행 wrapper."""
-        job.status = JobStatus.RUNNING
-        job.started_at = datetime.utcnow().isoformat() + "Z"
+        with self._lock:
+            job.status = JobStatus.RUNNING
+            job.started_at = datetime.now(timezone.utc).isoformat()
 
         try:
             result = func(**job.params)
-            job.result = result
-            job.status = JobStatus.SUCCEEDED
+            with self._lock:
+                job.result = result
+                job.status = JobStatus.SUCCEEDED
         except Exception as e:
             logger.exception("Job %s 실패", job.id)
-            job.error = str(e)
-            job.status = JobStatus.FAILED
+            with self._lock:
+                job.error = str(e)
+                job.status = JobStatus.FAILED
         finally:
-            job.completed_at = datetime.utcnow().isoformat() + "Z"
+            with self._lock:
+                job.completed_at = datetime.now(timezone.utc).isoformat()
 
     def get(self, job_id: str) -> Job | None:
         return self._jobs.get(job_id)

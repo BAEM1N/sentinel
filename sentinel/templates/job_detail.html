@@ -124,6 +124,30 @@
   const jobId = '{{ job.id }}';
   let currentStatus = '{{ job.status }}';
 
+  function createResultRow(label, bgClass, textClass, filePath, addMarginBottom) {
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-3 text-[13px]' + (addMarginBottom ? ' mb-2' : '');
+
+    const badgeEl = document.createElement('span');
+    badgeEl.className = 'inline-block ' + bgClass + ' ' + textClass + ' text-2xs px-1.5 py-0.5 font-semibold tracking-wide';
+    badgeEl.textContent = label;
+
+    const pathEl = document.createElement('span');
+    pathEl.className = 'font-mono text-xs text-ink-light';
+    pathEl.textContent = filePath;
+
+    const linkEl = document.createElement('a');
+    const fileName = filePath.split('/').pop();
+    linkEl.href = '/reports/' + encodeURIComponent(fileName);
+    linkEl.className = 'text-2xs text-ink-muted hover:text-ink uppercase tracking-wide transition-colors ml-auto';
+    linkEl.textContent = 'View';
+
+    row.appendChild(badgeEl);
+    row.appendChild(pathEl);
+    row.appendChild(linkEl);
+    return row;
+  }
+
   function formatDuration(startedAt, completedAt) {
     if (!startedAt) return '—';
     const start = new Date(startedAt);
@@ -187,34 +211,32 @@
 
           // Status badge 업데이트
           const badge = document.getElementById('status-badge');
+          badge.textContent = '';
+          const badgeSpan = document.createElement('span');
+          badgeSpan.className = 'inline-block text-2xs px-2 py-1 font-semibold tracking-wide uppercase';
+
           if (data.status === 'succeeded') {
-            badge.innerHTML = '<span class="inline-block bg-ink text-white text-2xs px-2 py-1 font-semibold tracking-wide uppercase">Succeeded</span>';
+            badgeSpan.className += ' bg-ink text-white';
+            badgeSpan.textContent = 'Succeeded';
+            badge.appendChild(badgeSpan);
 
             // Result 표시
             const resultSection = document.getElementById('result-section');
             resultSection.classList.remove('hidden');
             if (data.result) {
-              let html = '';
+              const container = document.getElementById('result-content');
+              container.textContent = '';
               if (data.result.md_path) {
-                const mdName = data.result.md_path.split('/').pop();
-                html += '<div class="flex items-center gap-3 text-[13px] mb-2">';
-                html += '<span class="inline-block border border-rule text-ink-muted text-2xs px-1.5 py-0.5 font-semibold tracking-wide">MD</span>';
-                html += '<span class="font-mono text-xs text-ink-light">' + data.result.md_path + '</span>';
-                html += '<a href="/reports/' + mdName + '" class="text-2xs text-ink-muted hover:text-ink uppercase tracking-wide transition-colors ml-auto">View</a>';
-                html += '</div>';
+                container.appendChild(createResultRow('MD', 'border border-rule', 'text-ink-muted', data.result.md_path, true));
               }
               if (data.result.html_path) {
-                const htmlName = data.result.html_path.split('/').pop();
-                html += '<div class="flex items-center gap-3 text-[13px]">';
-                html += '<span class="inline-block bg-ink text-white text-2xs px-1.5 py-0.5 font-semibold tracking-wide">HTML</span>';
-                html += '<span class="font-mono text-xs text-ink-light">' + data.result.html_path + '</span>';
-                html += '<a href="/reports/' + htmlName + '" class="text-2xs text-ink-muted hover:text-ink uppercase tracking-wide transition-colors ml-auto">View</a>';
-                html += '</div>';
+                container.appendChild(createResultRow('HTML', 'bg-ink', 'text-white', data.result.html_path, false));
               }
-              document.getElementById('result-content').innerHTML = html;
             }
           } else {
-            badge.innerHTML = '<span class="inline-block bg-red-600 text-white text-2xs px-2 py-1 font-semibold tracking-wide uppercase">Failed</span>';
+            badgeSpan.className += ' bg-red-600 text-white';
+            badgeSpan.textContent = 'Failed';
+            badge.appendChild(badgeSpan);
 
             // Error 표시
             const errorSection = document.getElementById('error-section');
