@@ -1004,7 +1004,10 @@ async def create_playbook(
     except (json.JSONDecodeError, TypeError):
         return HTMLResponse("Invalid JSON in steps", status_code=400)
 
-    playbook_manager.create(name=name, description=description, steps=steps)
+    try:
+        playbook_manager.create(name=name, description=description, steps=steps)
+    except ValueError as e:
+        return HTMLResponse(f"<h1>입력 오류: {e}</h1>", status_code=400)
     return RedirectResponse(url="/playbooks", status_code=303)
 
 
@@ -1094,7 +1097,7 @@ async def page_settings(request: Request):
     _SECRET_KEYS = {"LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "SENTINEL_API_KEY"}
     env_vars = [
         ("SENTINEL_PROVIDER", os.environ.get("SENTINEL_PROVIDER", ""), "openai"),
-        ("SENTINEL_MODEL", os.environ.get("SENTINEL_MODEL", ""), "gpt-5.4"),
+        ("SENTINEL_MODEL", os.environ.get("SENTINEL_MODEL", ""), "gpt-4.1"),
         ("SENTINEL_FALLBACK_MODEL", os.environ.get("SENTINEL_FALLBACK_MODEL", ""), "gpt-4.1-mini"),
         ("LANGFUSE_HOST", os.environ.get("LANGFUSE_HOST", ""), "https://cloud.langfuse.com"),
         ("LANGFUSE_PUBLIC_KEY", os.environ.get("LANGFUSE_PUBLIC_KEY", ""), ""),

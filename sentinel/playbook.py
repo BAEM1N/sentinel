@@ -12,6 +12,9 @@ from datetime import datetime, timezone
 logger = logging.getLogger("sentinel.playbook")
 
 
+VALID_STEP_TYPES = {"report", "batch_eval", "alert_check"}
+
+
 class PlaybookManager:
     """SQLite 기반 Playbook 관리자."""
 
@@ -73,6 +76,12 @@ class PlaybookManager:
 
     def create(self, name: str, description: str, steps: list[dict]) -> dict:
         """Playbook 생성."""
+        for i, step in enumerate(steps):
+            st = step.get("type", "")
+            if st not in VALID_STEP_TYPES:
+                raise ValueError(
+                    f"Step {i + 1}: 잘못된 type '{st}' (허용: {VALID_STEP_TYPES})"
+                )
         self._ensure_initialized()
         now = datetime.now(timezone.utc).isoformat()
         steps_json = json.dumps(steps, ensure_ascii=False)
