@@ -43,15 +43,14 @@ class ReportService:
         model=None,
         auto_html: bool | None = None,
     ):
-        self.reports_dir = reports_dir or os.environ.get(
-            "SENTINEL_REPORTS_DIR", "./reports"
-        )
+        from sentinel.settings import REPORTS_DIR as _default_reports_dir
+        self.reports_dir = reports_dir or _default_reports_dir
         if model is not None:
             self._model = model
         else:
-            from sentinel.config import model as default_model
+            import sentinel.config as _config
 
-            self._model = default_model
+            self._model = _config.get_model()
 
         self.auto_html = auto_html
 

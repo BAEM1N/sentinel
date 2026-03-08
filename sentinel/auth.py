@@ -191,13 +191,22 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
                 # POST 요청 CSRF 검증
                 if request.method == "POST":
-                    body = await request.body()
-                    form_data = parse_qs(body.decode("utf-8", errors="replace"))
-                    form_csrf = form_data.get("_csrf_token", [""])[0]
-                    if not secrets.compare_digest(form_csrf, session["csrf_token"]):
-                        return JSONResponse(
-                            {"error": "CSRF token mismatch"}, status_code=403
-                        )
+                    # JSON API: X-CSRF-Token 헤더 우선 확인
+                    header_csrf = request.headers.get("x-csrf-token", "")
+                    if header_csrf:
+                        if not secrets.compare_digest(header_csrf, session["csrf_token"]):
+                            return JSONResponse(
+                                {"error": "CSRF token mismatch"}, status_code=403
+                            )
+                    else:
+                        # Form POST: body에서 _csrf_token 확인
+                        body = await request.body()
+                        form_data = parse_qs(body.decode("utf-8", errors="replace"))
+                        form_csrf = form_data.get("_csrf_token", [""])[0]
+                        if not secrets.compare_digest(form_csrf, session["csrf_token"]):
+                            return JSONResponse(
+                                {"error": "CSRF token mismatch"}, status_code=403
+                            )
 
                 return await call_next(request)
 

@@ -5,7 +5,7 @@ import logging
 
 from langchain.tools import tool
 
-from sentinel.config import lf_client
+import sentinel.config as config
 
 logger = logging.getLogger("sentinel.tools.traces")
 
@@ -66,7 +66,7 @@ def list_traces(
         kwargs["page"] = page
 
     try:
-        res = lf_client.api.trace.list(**kwargs)
+        res = config.get_lf_client().api.trace.list(**kwargs)
     except Exception as e:
         logger.exception("Langfuse trace list API 호출 실패")
         return json.dumps({"error": f"Langfuse API 오류: {e}"}, ensure_ascii=False)
@@ -103,7 +103,7 @@ def get_trace_detail(trace_id: str) -> str:
         trace_id: 조회할 트레이스 ID
     """
     try:
-        t = lf_client.api.trace.get(trace_id)
+        t = config.get_lf_client().api.trace.get(trace_id)
     except Exception as e:
         logger.exception("trace detail API 호출 실패: %s", trace_id)
         return json.dumps({"error": f"Langfuse API 오류: {e}"}, ensure_ascii=False)
@@ -148,7 +148,7 @@ def list_sessions(limit: int = 20) -> str:
         limit: 최대 조회 수
     """
     try:
-        res = lf_client.api.sessions.list(limit=limit)
+        res = config.get_lf_client().api.sessions.list(limit=limit)
     except Exception as e:
         logger.exception("sessions list API 호출 실패")
         return json.dumps({"error": f"Langfuse API 오류: {e}"}, ensure_ascii=False)

@@ -27,13 +27,13 @@ import sys
 import uuid
 
 from sentinel.agent import create_sentinel_agent
-from sentinel.config import lf_config
+import sentinel.config as config
 
 
 def run_query(agent, query: str, thread_id: str | None = None):
     """단일 질의를 실행하고 결과를 출력합니다."""
     tid = thread_id or str(uuid.uuid4())[:8]
-    config = {"configurable": {"thread_id": f"sentinel-{tid}"}, **lf_config}
+    config = {"configurable": {"thread_id": f"sentinel-{tid}"}, **config.get_lf_config()}
     response = agent.invoke(
         {"messages": [{"role": "user", "content": query}]},
         config=config,

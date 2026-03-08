@@ -4,7 +4,7 @@ import json
 
 from langchain.tools import tool
 
-from sentinel.config import lf_client
+import sentinel.config as config
 
 
 @tool
@@ -27,7 +27,7 @@ def manage_datasets(
         description: 데이터셋 설명 (create 시)
     """
     if action == "list":
-        res = lf_client.api.datasets.list(limit=50)
+        res = config.get_lf_client().api.datasets.list(limit=50)
         data = res.data if hasattr(res, "data") else res
         return json.dumps(
             [
@@ -40,7 +40,7 @@ def manage_datasets(
         )
 
     elif action == "create":
-        lf_client.api.datasets.create(name=dataset_name, description=description)
+        config.get_lf_client().api.datasets.create(name=dataset_name, description=description)
         return f"데이터셋 '{dataset_name}' 생성 완료"
 
     elif action == "add_item":
@@ -56,11 +56,11 @@ def manage_datasets(
             kwargs["expected_output"] = item_expected
         if source_trace_id:
             kwargs["source_trace_id"] = source_trace_id
-        lf_client.api.dataset_items.create(**kwargs)
+        config.get_lf_client().api.dataset_items.create(**kwargs)
         return f"데이터셋 '{dataset_name}'에 아이템 추가 완료"
 
     elif action == "list_items":
-        res = lf_client.api.dataset_items.list(
+        res = config.get_lf_client().api.dataset_items.list(
             dataset_name=dataset_name, limit=50
         )
         data = res.data if hasattr(res, "data") else res
@@ -97,7 +97,7 @@ def manage_annotations(
     if action == "create":
         from langfuse.api.resources.comments.types import CreateCommentRequest
 
-        lf_client.api.comments.create(
+        config.get_lf_client().api.comments.create(
             request=CreateCommentRequest(
                 object_type=object_type,
                 object_id=object_id,
@@ -107,7 +107,7 @@ def manage_annotations(
         )
         return f"코멘트 작성 완료: {object_type} {object_id[:12]}..."
 
-    res = lf_client.api.comments.get(
+    res = config.get_lf_client().api.comments.get(
         object_type=object_type, object_id=object_id
     )
     data = res.data if hasattr(res, "data") else res

@@ -19,12 +19,12 @@ logger = logging.getLogger("sentinel.web")
 @router.get("/reviews", response_class=HTMLResponse)
 async def page_reviews(request: Request, threshold: float = Query(0.5, ge=0.0, le=1.0)):
     """Review Inbox — 낮은 점수 스코어 검토 큐."""
-    from sentinel.config import lf_client
+    import sentinel.config as config
 
     scores = []
     api_error = ""
     try:
-        res = lf_client.api.score_v_2.get(limit=100)
+        res = config.get_lf_client().api.score_v_2.get(limit=100)
         data = res.data if hasattr(res, "data") else res
         for s in data:
             value = getattr(s, "value", None)
@@ -59,10 +59,10 @@ async def page_reviews(request: Request, threshold: float = Query(0.5, ge=0.0, l
 
 @router.post("/reviews/{trace_id}/acknowledge")
 async def action_acknowledge_review(request: Request, trace_id: str):
-    from sentinel.config import lf_client
+    import sentinel.config as config
 
     try:
-        lf_client.score(
+        config.get_lf_client().score(
             trace_id=trace_id,
             name="reviewed",
             value=1.0,

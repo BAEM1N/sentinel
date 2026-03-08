@@ -58,9 +58,9 @@ def create_app() -> FastAPI:
     app.state.templates = Jinja2Templates(directory=str(templates_dir))
 
     # runtime 디렉토리 초기화
-    reports_dir = os.environ.get("SENTINEL_REPORTS_DIR", "./runtime/reports")
-    os.makedirs(reports_dir, exist_ok=True)
-    os.makedirs(os.environ.get("SENTINEL_CHECKPOINT_DIR", "./runtime/checkpoints"), exist_ok=True)
+    from sentinel.settings import REPORTS_DIR, CHECKPOINT_DIR
+    os.makedirs(REPORTS_DIR, exist_ok=True)
+    os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 
     # 인증 미들웨어
     from sentinel.auth import AuthMiddleware

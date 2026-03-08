@@ -32,16 +32,16 @@ async def api_chat(request: Request):
     async def event_stream():
         try:
             from sentinel.agent import create_sentinel_agent
-            from sentinel.config import lf_config
+            import sentinel.config as sentinel_config
 
             agent = create_sentinel_agent()
-            config = {"configurable": {"thread_id": f"sentinel-{thread_id}"}, **lf_config}
+            run_config = {"configurable": {"thread_id": f"sentinel-{thread_id}"}, **sentinel_config.get_lf_config()}
 
             # 스트리밍 실행
             final_content = ""
             for event in agent.stream(
                 {"messages": [{"role": "user", "content": message}]},
-                config=config,
+                config=run_config,
                 stream_mode="messages",
             ):
                 msg, metadata = event if isinstance(event, tuple) else (event, {})

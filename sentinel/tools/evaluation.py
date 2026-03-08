@@ -6,7 +6,7 @@ import re
 
 from langchain.tools import tool
 
-from sentinel.config import lf_client, model
+import sentinel.config as config
 
 logger = logging.getLogger("sentinel.tools.evaluation")
 
@@ -24,7 +24,7 @@ def list_scores(name: str = "", limit: int = 50) -> str:
         kwargs["name"] = name
 
     try:
-        res = lf_client.api.score_v_2.get(**kwargs)
+        res = config.get_lf_client().api.score_v_2.get(**kwargs)
     except Exception as e:
         logger.exception("scores API 호출 실패")
         return json.dumps({"error": f"Langfuse API 오류: {e}"}, ensure_ascii=False)
@@ -56,10 +56,10 @@ def create_score(
         comment: 평가 코멘트
     """
     try:
-        lf_client.create_score(
+        config.get_lf_client().create_score(
             trace_id=trace_id, name=name, value=value, comment=comment
         )
-        lf_client.flush()
+        config.get_lf_client().flush()
     except Exception as e:
         logger.exception("score 생성 실패")
         return f"스코어 생성 실패: {e}"
@@ -97,7 +97,7 @@ def batch_evaluate(
     elif dataset_name:
         # 데이터셋에서 source_trace_id 추출
         try:
-            res = lf_client.api.dataset_items.list(
+            res = config.get_lf_client().api.dataset_items.list(
                 dataset_name=dataset_name, limit=sample_size
             )
             items = res.data if hasattr(res, "data") else res
@@ -117,7 +117,7 @@ def batch_evaluate(
         if to_ts:
             kwargs["to_timestamp"] = to_ts
         try:
-            res = lf_client.api.trace.list(**kwargs)
+            res = config.get_lf_client().api.trace.list(**kwargs)
             data = res.data if hasattr(res, "data") else res
             ids = [t.id for t in data]
         except Exception as e:
@@ -133,7 +133,7 @@ def batch_evaluate(
     for trace_id in ids:
         try:
             # 트레이스 조회
-            t = lf_client.api.trace.get(trace_id)
+            t = config.get_lf_client().api.trace.get(trace_id)
             inp = str(getattr(t, "input", ""))[:2000]
             out = str(getattr(t, "output", ""))[:2000]
 
@@ -152,7 +152,7 @@ def batch_evaluate(
                 "각 기준별 점수(N/5)와 근거를 간략히 작성하세요.\n"
                 "마지막 줄: `종합점수: X.XX` (0.00~1.00)"
             )
-            resp = model.invoke(eval_msg)
+            resp = config.get_model().invoke(eval_msg)
 
             match = re.search(r"종합점수[:\s]*([\d.]+)", resp.content)
             score = (
@@ -160,7 +160,7 @@ def batch_evaluate(
             )
 
             # 스코어 저장
-            lf_client.create_score(
+            config.get_lf_client().create_score(
                 trace_id=trace_id,
                 name="llm-judge-batch",
                 value=score,
@@ -180,7 +180,7 @@ def batch_evaluate(
             logger.error("batch eval 실패 trace=%s: %s", trace_id, e)
             errors.append({"trace_id": trace_id, "error": str(e)})
 
-    lf_client.flush()
+    config.get_lf_client().flush()
 
     # 3. 결과 요약
     scores = [r["score"] for r in results]
@@ -227,7 +227,7 @@ def evaluate_with_llm(
         criteria: 평가 기준 (쉼표 구분, 기본: 정확성/완전성/유용성/안전성/일관성)
     """
     try:
-        t = lf_client.api.trace.get(trace_id)
+        t = config.get_lf_client().api.trace.get(trace_id)
     except Exception as e:
         logger.exception("evaluate_with_llm: trace 조회 실패: %s", trace_id)
         return f"트레이스 조회 실패: {e}"
@@ -259,7 +259,7 @@ def evaluate_with_llm(
         "| 기준명 | N/5 |\n| ... | ... |\n\n"
         "마지막 줄에 반드시 `종합점수: X.XX` (0.00~1.00) 형식으로 작성하세요."
     )
-    resp = model.invoke(eval_msg)
+    resp = config.get_model().invoke(eval_msg)
     match = re.search(r"종합점수[:\s]*([\d.]+)", resp.content)
     score = min(1.0, max(0.0, float(match.group(1)))) if match else 0.5
 
@@ -270,11 +270,11 @@ def evaluate_with_llm(
     feedback = feedback_match.group(1).strip()[:300] if feedback_match else ""
     comment = f"score={score} | {feedback}" if feedback else resp.content[:500]
 
-    lf_client.create_score(
+    config.get_lf_client().create_score(
         trace_id=trace_id,
         name="llm-judge",
         value=score,
         comment=comment,
     )
-    lf_client.flush()
+    config.get_lf_client().flush()
     return f"평가 완료 (종합점수: {score})\n\n{resp.content}"

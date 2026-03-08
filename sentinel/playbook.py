@@ -275,9 +275,9 @@ class PlaybookManager:
             # 기본 메트릭 수집: Langfuse에서 최근 트레이스 통계 추출
             metrics_data: dict[str, float] = {}
             try:
-                from sentinel.config import lf_client
+                import sentinel.config as _config
 
-                res = lf_client.api.trace.list(limit=50)
+                res = _config.get_lf_client().api.trace.list(limit=50)
                 data = res.data if hasattr(res, "data") else res
                 if data:
                     latencies = [

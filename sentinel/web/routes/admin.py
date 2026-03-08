@@ -8,9 +8,9 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
-router = APIRouter()
+from sentinel.settings import REPORTS_DIR, CHECKPOINT_DIR, TIMEZONE
 
-REPORTS_DIR = os.environ.get("SENTINEL_REPORTS_DIR", "./runtime/reports")
+router = APIRouter()
 
 
 # ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@ async def page_audit(request: Request, limit: int = 50, run_id: str = ""):
 @router.get("/scheduler", response_class=HTMLResponse)
 async def page_scheduler(request: Request):
     scheduler = getattr(request.app.state, "scheduler", None)
-    tz_label = os.environ.get("SENTINEL_TIMEZONE", "UTC")
+    tz_label = TIMEZONE
     desc_map = {
         "daily_report": f"Every day at 00:00 ({tz_label})",
         "weekly_report": f"Every Monday at 00:00 ({tz_label})",
@@ -123,7 +123,7 @@ def _mask_secret(value: str) -> str:
 
 @router.get("/settings", response_class=HTMLResponse)
 async def page_settings(request: Request):
-    from sentinel.config import lf_client
+    import sentinel.config as config
 
     _SECRET_KEYS = {"LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "SENTINEL_API_KEY"}
     env_vars = [
@@ -152,14 +152,14 @@ async def page_settings(request: Request):
     langfuse_status = "OK"
     langfuse_error = ""
     try:
-        lf_client.api.trace.list(limit=1)
+        config.get_lf_client().api.trace.list(limit=1)
     except Exception as e:
         langfuse_status = "Error"
         langfuse_error = str(e)
 
     langfuse_host = os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com")
 
-    reports_dir = Path(os.environ.get("SENTINEL_REPORTS_DIR", "./runtime/reports"))
+    reports_dir = Path(REPORTS_DIR)
     storage_ok = reports_dir.exists()
     report_file_count = 0
     if storage_ok:
@@ -212,8 +212,8 @@ async def readiness(request: Request):
     checks: dict[str, str] = {}
 
     try:
-        from sentinel.config import lf_client
-        lf_client.api.trace.list(limit=1)
+        import sentinel.config as config
+        config.get_lf_client().api.trace.list(limit=1)
         checks["langfuse"] = "ok"
     except Exception as e:
         checks["langfuse"] = f"error: {e}"

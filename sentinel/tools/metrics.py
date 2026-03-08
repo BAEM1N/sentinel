@@ -9,7 +9,7 @@ from pathlib import Path
 
 from langchain.tools import tool
 
-from sentinel.config import lf_client, model
+import sentinel.config as config
 
 logger = logging.getLogger("sentinel.tools.metrics")
 
@@ -101,7 +101,7 @@ def query_metrics(
         )
 
     try:
-        result = lf_client.api.metrics.metrics(query=json.dumps(q))
+        result = config.get_lf_client().api.metrics.metrics(query=json.dumps(q))
     except Exception as e:
         logger.exception("Metrics API 호출 실패")
         return json.dumps({"error": f"Langfuse Metrics API 오류: {e}"}, ensure_ascii=False)
@@ -386,11 +386,11 @@ def _collect_report_data(from_ts: str, to_ts: str, gran: str):
         "orderBy": [],
         "rowLimit": 100,
     })
-    metrics_data = lf_client.api.metrics.metrics(query=metrics_q)
+    metrics_data = config.get_lf_client().api.metrics.metrics(query=metrics_q)
 
     from_dt = datetime.fromisoformat(from_ts.replace("Z", "+00:00"))
     to_dt = datetime.fromisoformat(to_ts.replace("Z", "+00:00"))
-    traces_res = lf_client.api.trace.list(limit=30, from_timestamp=from_dt, to_timestamp=to_dt)
+    traces_res = config.get_lf_client().api.trace.list(limit=30, from_timestamp=from_dt, to_timestamp=to_dt)
     traces_data = traces_res.data if hasattr(traces_res, "data") else traces_res
     traces_summary = [
         {
@@ -409,7 +409,7 @@ def _collect_report_data(from_ts: str, to_ts: str, gran: str):
     ]
 
     try:
-        scores_res = lf_client.api.score_v_2.get(limit=50, from_timestamp=from_dt, to_timestamp=to_dt)
+        scores_res = config.get_lf_client().api.score_v_2.get(limit=50, from_timestamp=from_dt, to_timestamp=to_dt)
         scores_data = scores_res.data if hasattr(scores_res, "data") else scores_res
         scores_summary = [
             {"name": s.name, "value": s.value, "trace_id": getattr(s, "trace_id", None)}

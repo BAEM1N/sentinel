@@ -348,9 +348,13 @@ async function handleSubmit(e) {
   let fullText = '';
 
   try {
+    const csrfToken = document.querySelector('input[name="_csrf_token"]').value;
     const resp = await fetch('/api/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken,
+      },
       body: JSON.stringify({ message, thread_id: threadId }),
     });
 

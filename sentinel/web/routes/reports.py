@@ -1,39 +1,19 @@
 """보고서 라우트 — 목록, 상세, 발행, 생성."""
 
-import os
 from datetime import datetime
-from html import escape as html_escape
 from pathlib import Path
 
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, RedirectResponse
 
+from sentinel.settings import REPORTS_DIR, list_reports
+
 router = APIRouter()
-
-REPORTS_DIR = os.environ.get("SENTINEL_REPORTS_DIR", "./runtime/reports")
-
-
-def _list_reports() -> list[dict]:
-    reports_path = Path(REPORTS_DIR)
-    if not reports_path.exists():
-        return []
-    files = []
-    for f in reports_path.iterdir():
-        if f.suffix in (".md", ".html"):
-            stat = f.stat()
-            files.append({
-                "filename": f.name,
-                "type": "HTML" if f.suffix == ".html" else "MD",
-                "size": stat.st_size,
-                "modified": stat.st_mtime,
-            })
-    files.sort(key=lambda x: x["modified"], reverse=True)
-    return files
 
 
 @router.get("/reports", response_class=HTMLResponse)
 async def page_reports(request: Request):
-    reports = _list_reports()
+    reports = list_reports()
     return request.app.state.templates.TemplateResponse(request, "reports.html", {
         "reports": reports,
         "active_page": "reports",

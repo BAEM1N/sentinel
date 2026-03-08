@@ -19,3 +19,9 @@ external/
 # IDE & tools
 .omx/
 firebase-debug.log
+
+# Local planning / generated strategy outputs
+instruct/
+
+# Generated planning artifacts
+instruct/

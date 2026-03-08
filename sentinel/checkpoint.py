@@ -21,7 +21,8 @@ def create_checkpointer():
         return InMemorySaver()
 
     # SQLite
-    checkpoint_dir = os.environ.get("SENTINEL_CHECKPOINT_DIR", ".sentinel/checkpoints")
+    from sentinel.settings import CHECKPOINT_DIR
+    checkpoint_dir = CHECKPOINT_DIR
     os.makedirs(checkpoint_dir, exist_ok=True)
     db_path = os.path.join(checkpoint_dir, "sentinel.db")
     saver = SqliteSaver.from_conn_string(db_path)

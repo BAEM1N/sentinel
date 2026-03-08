@@ -11,14 +11,13 @@ from langchain.agents.middleware import (
 )
 from sentinel.checkpoint import create_checkpointer
 
-from sentinel.config import model, _create_model, _PROVIDER_FALLBACK_DEFAULTS
+import sentinel.config as config
+from sentinel.config import _create_model, _PROVIDER_FALLBACK_DEFAULTS
 from sentinel.prompts import SENTINEL_SYSTEM_PROMPT
+from sentinel.settings import REPORTS_DIR, SKILLS_DIR, RUN_LIMIT
 from sentinel.subagents import all_subagents
 from sentinel.tools import all_tools
 
-REPORTS_DIR = os.environ.get("SENTINEL_REPORTS_DIR", "./reports")
-SKILLS_DIR = os.environ.get("SENTINEL_SKILLS_DIR", "./skills/")
-RUN_LIMIT = int(os.environ.get("SENTINEL_RUN_LIMIT", "30"))
 FALLBACK_MODEL_NAME = os.environ.get("SENTINEL_FALLBACK_MODEL", "")
 
 
@@ -38,8 +37,9 @@ def _get_fallback_model():
 def create_sentinel_agent():
     """Sentinel LLMOps 에이전트를 생성합니다."""
     fallback = _get_fallback_model()
+    mdl = config.get_model()
     return create_deep_agent(
-        model=model,
+        model=mdl,
         tools=all_tools,
         subagents=all_subagents,
         system_prompt=SENTINEL_SYSTEM_PROMPT,
@@ -47,7 +47,7 @@ def create_sentinel_agent():
         skills=[SKILLS_DIR],
         checkpointer=create_checkpointer(),
         middleware=[
-            SummarizationMiddleware(model=model, trigger=("messages", 15)),
+            SummarizationMiddleware(model=mdl, trigger=("messages", 15)),
             ModelCallLimitMiddleware(run_limit=RUN_LIMIT),
             ModelFallbackMiddleware(fallback),
         ],
